@@ -14,14 +14,15 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 #ifndef HELPTEXT_H
 #define HELPTEXT_H
 
 #include "opentyr.h"
 
-#include "SDL.h"
+#include <SDL2/SDL.h>
 
 #include <stdio.h>
 
@@ -29,7 +30,7 @@
 
 #define DESTRUCT_MODES 5
 
-extern const JE_byte menuHelp[MENU_MAX][11];   /* [1..14, 1..11] */
+extern const JE_byte menuHelp[MENU_MAX][11]; /* [1..14, 1..11] */
 
 extern JE_byte verticalHeight;
 extern JE_byte helpBoxColor, helpBoxBrightness, helpBoxShadeType;
@@ -67,14 +68,15 @@ extern char destructHelp[25][22];
 extern char weaponNames[17][17];
 extern char destructModeName[DESTRUCT_MODES][13];
 extern char shipInfo[HELPTEXT_SHIPINFO_COUNT][2][256];
-extern char menuInt[MENU_MAX+1][11][18];
+extern char menuInt[MENU_MAX + 1][11][18];
 
-void read_encrypted_pascal_string( char *s, size_t size, FILE *f );
-void skip_pascal_string( FILE *f );
+void read_encrypted_pascal_string(char *s, size_t size, FILE *f);
+void skip_pascal_string(FILE *f);
 
-void JE_helpBox( SDL_Surface *screen, int x, int y, const char *message, unsigned int boxwidth );
-void JE_HBox( SDL_Surface *screen, int x, int y, unsigned int  messagenum, unsigned int boxwidth );
-void JE_loadHelpText( void );
+void JE_helpBox(SDL_Surface *screen, int x, int y, const char *message,
+                unsigned int boxwidth);
+void JE_HBox(SDL_Surface *screen, int x, int y, unsigned int messagenum,
+             unsigned int boxwidth);
+void JE_loadHelpText(void);
 
 #endif /* HELPTEXT_H */
-

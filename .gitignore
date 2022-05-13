@@ -1,4 +1,6 @@
 /data/
+/build/
+/.vscode/
 
 opentyrian.cfg
 tyrian.cfg

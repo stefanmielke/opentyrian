@@ -14,14 +14,15 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 #include "file.h"
 
 #include "opentyr.h"
 #include "varz.h"
 
-#include "SDL.h"
+#include <SDL2/SDL.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -31,122 +32,113 @@
 const char *custom_data_dir = NULL;
 
 // finds the Tyrian data directory
-const char *data_dir( void )
-{
-	const char *const dirs[] =
-	{
-		custom_data_dir,
-		TYRIAN_DIR,
-		"data",
-		".",
-	};
+const char *data_dir(void) {
+  const char *const dirs[] = {
+      custom_data_dir,
+      TYRIAN_DIR,
+      "data",
+      ".",
+  };
 
-	static const char *dir = NULL;
+  static const char *dir = NULL;
 
-	if (dir != NULL)
-		return dir;
+  if (dir != NULL)
+    return dir;
 
-	for (uint i = 0; i < COUNTOF(dirs); ++i)
-	{
-		if (dirs[i] == NULL)
-			continue;
+  for (uint i = 0; i < COUNTOF(dirs); ++i) {
+    if (dirs[i] == NULL)
+      continue;
 
-		FILE *f = dir_fopen(dirs[i], "tyrian1.lvl", "rb");
-		if (f)
-		{
-			fclose(f);
+    FILE *f = dir_fopen(dirs[i], "tyrian1.lvl", "rb");
+    if (f) {
+      fclose(f);
 
-			dir = dirs[i];
-			break;
-		}
-	}
+      dir = dirs[i];
+      break;
+    }
+  }
 
-	if (dir == NULL) // data not found
-		dir = "";
+  if (dir == NULL) // data not found
+    dir = "";
 
-	return dir;
+  return dir;
 }
 
 // prepend directory and fopen
-FILE *dir_fopen( const char *dir, const char *file, const char *mode )
-{
-	char *path = malloc(strlen(dir) + 1 + strlen(file) + 1);
-	sprintf(path, "%s/%s", dir, file);
+FILE *dir_fopen(const char *dir, const char *file, const char *mode) {
+  char *path = malloc(strlen(dir) + 1 + strlen(file) + 1);
+  sprintf(path, "%s/%s", dir, file);
 
-	FILE *f = fopen(path, mode);
+  FILE *f = fopen(path, mode);
 
-	free(path);
+  free(path);
 
-	return f;
+  return f;
 }
 
 // warn when dir_fopen fails
-FILE *dir_fopen_warn(  const char *dir, const char *file, const char *mode )
-{
-	FILE *f = dir_fopen(dir, file, mode);
+FILE *dir_fopen_warn(const char *dir, const char *file, const char *mode) {
+  FILE *f = dir_fopen(dir, file, mode);
 
-	if (f == NULL)
-		fprintf(stderr, "warning: failed to open '%s': %s\n", file, strerror(errno));
+  if (f == NULL)
+    fprintf(stderr, "warning: failed to open '%s': %s\n", file,
+            strerror(errno));
 
-	return f;
+  return f;
 }
 
 // die when dir_fopen fails
-FILE *dir_fopen_die( const char *dir, const char *file, const char *mode )
-{
-	FILE *f = dir_fopen(dir, file, mode);
+FILE *dir_fopen_die(const char *dir, const char *file, const char *mode) {
+  FILE *f = dir_fopen(dir, file, mode);
 
-	if (f == NULL)
-	{
-		fprintf(stderr, "error: failed to open '%s': %s\n", file, strerror(errno));
-		fprintf(stderr, "error: One or more of the required Tyrian " TYRIAN_VERSION " data files could not be found.\n"
-		                "       Please read the README file.\n");
-		JE_tyrianHalt(1);
-	}
+  if (f == NULL) {
+    fprintf(stderr, "error: failed to open '%s': %s\n", file, strerror(errno));
+    fprintf(stderr, "error: One or more of the required Tyrian " TYRIAN_VERSION
+                    " data files could not be found.\n"
+                    "       Please read the README file.\n");
+    JE_tyrianHalt(1);
+  }
 
-	return f;
+  return f;
 }
 
 // check if file can be opened for reading
-bool dir_file_exists( const char *dir, const char *file )
-{
-	FILE *f = dir_fopen(dir, file, "rb");
-	if (f != NULL)
-		fclose(f);
-	return (f != NULL);
+bool dir_file_exists(const char *dir, const char *file) {
+  FILE *f = dir_fopen(dir, file, "rb");
+  if (f != NULL)
+    fclose(f);
+  return (f != NULL);
 }
 
 // returns end-of-file position
-long ftell_eof( FILE *f )
-{
-	long pos = ftell(f);
+long ftell_eof(FILE *f) {
+  long pos = ftell(f);
 
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
+  fseek(f, 0, SEEK_END);
+  long size = ftell(f);
 
-	fseek(f, pos, SEEK_SET);
+  fseek(f, pos, SEEK_SET);
 
-	return size;
+  return size;
 }
 
-void fread_die(void *buffer, size_t size, size_t count, FILE *stream)
-{
-	size_t result = fread(buffer, size, count, stream);
-	if (result != count)
-	{
-		fprintf(stderr, "error: An unexpected problem occurred while reading from a file.\n");
-		SDL_Quit();
-		exit(EXIT_FAILURE);
-	}
+void fread_die(void *buffer, size_t size, size_t count, FILE *stream) {
+  size_t result = fread(buffer, size, count, stream);
+  if (result != count) {
+    fprintf(
+        stderr,
+        "error: An unexpected problem occurred while reading from a file.\n");
+    SDL_Quit();
+    exit(EXIT_FAILURE);
+  }
 }
 
-void fwrite_die(const void *buffer, size_t size, size_t count, FILE *stream)
-{
-	size_t result = fwrite(buffer, size, count, stream);
-	if (result != count)
-	{
-		fprintf(stderr, "error: An unexpected problem occurred while writing to a file.\n");
-		SDL_Quit();
-		exit(EXIT_FAILURE);
-	}
+void fwrite_die(const void *buffer, size_t size, size_t count, FILE *stream) {
+  size_t result = fwrite(buffer, size, count, stream);
+  if (result != count) {
+    fprintf(stderr,
+            "error: An unexpected problem occurred while writing to a file.\n");
+    SDL_Quit();
+    exit(EXIT_FAILURE);
+  }
 }
