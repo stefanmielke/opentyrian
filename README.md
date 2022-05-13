@@ -11,7 +11,7 @@ Another potential issue is on loading assets, it may end up using more memory th
 ## Building
 
 - Clone the repo **with submodules**
-- Download the [data files here](https://camanis.net/tyrian/tyrian21.zip) and unzip them on `/filesystem`. You should have a `/filesystem/tyrian21/[all_files_here]` at the end.
+- Download the [data files here](https://camanis.net/tyrian/tyrian21.zip) and unzip them on `/filesystem`. You should have `/filesystem/tyrian21/[all_files_here]` at the end.
 - Download [libdragon-cli](https://github.com/anacierdem/libdragon-docker) and run `libdragon make` on the root of the project.
 
 ---
