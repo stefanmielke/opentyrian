@@ -1,4 +1,4 @@
-/*
+/* 
  * OpenTyrian: A modern cross-platform port of Tyrian
  * Copyright (C) 2007-2009  The OpenTyrian Development Team
  *
@@ -19,14 +19,17 @@
 #ifndef OPENTYR_H
 #define OPENTYR_H
 
-#include "SDL2/SDL_types.h"
-
+#include <SDL2/SDL_types.h>
 #include <math.h>
 #include <stdbool.h>
 
-#ifdef COUNTOF
-#undef COUNTOF
+#ifdef VITA
+#ifdef VDEBUG
+#include <psp2shell.h>
+#define printf psp2shell_print
 #endif
+#endif
+
 #define COUNTOF(x) ((unsigned)(sizeof(x) / sizeof *(x)))  // use only on arrays!
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -54,12 +57,15 @@ typedef bool   JE_boolean;
 typedef char   JE_char;
 typedef float  JE_real;
 
+#ifdef TYRIAN2000
+#define TYRIAN_VERSION "2000"
+#else
 #define TYRIAN_VERSION "2.1"
+#endif
 
-extern const char *opentyrian_str;
-extern const char *opentyrian_version;
+extern const char *opentyrian_str, *opentyrian_version;
 
-void openTyrianMenu( void );
+void opentyrian_menu( void );
 
 #endif /* OPENTYR_H */
 

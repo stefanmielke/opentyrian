@@ -17,6 +17,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 #include "arg_parse.h"
+#include "std_support.h"
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,16 +31,6 @@ static void permute( const char *argv[], int *first_nonopt, int *first_opt, int 
 
 static int parse_short_opt( int argc, const char *const argv[], const Options *options, Option *option );
 static int parse_long_opt( int argc, const char *const argv[], const Options *options, Option *option );
-
-/*!
- * \brief Locate a character in a a string.
- * 
- * \param[in] s the string
- * \param[in] c the character
- * \return the pointer to the first occurrence of \p c in \p s if there is an occurrences;
- *         otherwise the pointer to the terminating NUL character of \p s
- */
-static char *ot_strchrnul( const char *s, int c );
 
 Option parse_args( int argc, const char *argv[], const Options *options )
 {
@@ -140,7 +135,7 @@ static int parse_short_opt( int argc, const char *const argv[], const Options *o
 			
 			if (options->has_arg)
 			{
-				if (arg_attached)  // arg directly follows option
+				if (arg_attached)  // arg direclty follows option
 				{
 					option->arg = arg + offset + 1;
 					
@@ -189,7 +184,7 @@ static int parse_long_opt( int argc, const char *const argv[], const Options *op
 	const char *arg = argv[argn] + 2;  // ignore the "--"
 	
 	const size_t arg_len = strlen(arg),
-	             arg_opt_len = ot_strchrnul(arg, '=') - arg;  // length before "="
+	             arg_opt_len = strchrnul(arg, '=') - arg;  // length before "="
 	
 	const bool arg_attached = (arg_opt_len < arg_len),  // argument attached using "="?
 	           last_in_argv = (argn == argc - 1);
@@ -249,11 +244,4 @@ static int parse_long_opt( int argc, const char *const argv[], const Options *op
 	++argn;
 	
 	return argn;  // which arg in argv that parse_args() should examine when called again
-}
-
-static char *ot_strchrnul( const char *s, int c )
-{
-	for (; *s != c && *s != '\0'; ++s)
-		;
-	return (char *)s;
 }

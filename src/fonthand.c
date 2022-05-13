@@ -17,7 +17,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 #include "fonthand.h"
-
 #include "network.h"
 #include "nortsong.h"
 #include "nortvars.h"
@@ -50,6 +49,7 @@ const int font_ascii[256] =
 
 /* shape constants included in newshape.h */
 
+JE_integer defaultBrightness = -3;
 JE_byte textGlowFont, textGlowBrightness = 6;
 
 JE_boolean levelWarningDisplay;
@@ -64,8 +64,6 @@ JE_shortint warningColChange;
 
 void JE_dString( SDL_Surface * screen, int x, int y, const char *s, unsigned int font )
 {
-	const int defaultBrightness = -3;
-
 	int bright = 0;
 
 	for (int i = 0; s[i] != '\0'; ++i)
@@ -279,7 +277,7 @@ void JE_updateWarning( SDL_Surface * screen )
 		else
 		{
 			warningSoundDelay = 14;
-			JE_playSampleNum(S_WARNING);
+			JE_playSampleNum(17);
 		}
 	}
 }

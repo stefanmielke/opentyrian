@@ -16,18 +16,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "palette.h"
-
 #include "file.h"
 #include "nortsong.h"
 #include "opentyr.h"
+#include "palette.h"
 #include "video.h"
 
 #include <assert.h>
 
 static Uint32 rgb_to_yuv( int r, int g, int b );
 
+#ifdef TYRIAN2000
+#define PALETTE_COUNT 24
+#else
 #define PALETTE_COUNT 23
+#endif
 
 Palette palettes[PALETTE_COUNT];
 int palette_count;
@@ -54,11 +57,12 @@ void JE_loadPals( void )
 			// bits of the original value instead. This ensures that the value goes to 255 as the original goes
 			// to 63.
 
-			Uint8 rgb[3];
-			fread_u8_die(rgb, 3, f);
-			palettes[p][i].r = (rgb[0] << 2) | (rgb[0] >> 4);
-			palettes[p][i].g = (rgb[1] << 2) | (rgb[1] >> 4);
-			palettes[p][i].b = (rgb[2] << 2) | (rgb[2] >> 4);
+			int c = getc(f);
+			palettes[p][i].r = (c << 2) | (c >> 4);
+			c = getc(f);
+			palettes[p][i].g = (c << 2) | (c >> 4);
+			c = getc(f);
+			palettes[p][i].b = (c << 2) | (c >> 4);
 		}
 	}
 	
@@ -111,7 +115,7 @@ void step_fade_palette( int diff[256][3], int steps, unsigned int first_color, u
 	
 	for (unsigned int i = first_color; i <= last_color; i++)
 	{
-		const int delta[3] = { diff[i][0] / steps, diff[i][1] / steps, diff[i][2] / steps };
+		int delta[3] = { diff[i][0] / steps, diff[i][1] / steps, diff[i][2] / steps };
 		
 		diff[i][0] -= delta[0];
 		diff[i][1] -= delta[1];

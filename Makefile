@@ -1,11 +1,11 @@
 V=1
 SOURCE_DIR=src
-BUILD_DIR=build
+BUILD_DIR=build_n64
 include $(N64_INST)/include/n64.mk
 
 N64_CFLAGS += -Ilibs/sdl_n64/lib -D_POSIX_C_SOURCE=0 -DTARGET_N64 -DTYRIAN_DIR='"rom://tyrian21"'
 # warnings from original code
-N64_CFLAGS += -Wno-error=format-truncation -Wno-format-truncation -Wno-error=format -Wno-error=array-bounds
+N64_CFLAGS += -Wno-error=format-truncation -Wno-format-truncation -Wno-error=format -Wno-error=array-bounds -Wno-error=format-overflow= -Wno-error=restrict
 
 N64_ROM_TITLE = "opentyrian 64"
 N64_ROM_SAVETYPE = none

@@ -1,5 +1,6 @@
 /data/
 /build/
+/build_n64/
 /.vscode/
 
 /filesystem/tyrian21/

@@ -14,15 +14,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
- * USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 #ifndef HELPTEXT_H
 #define HELPTEXT_H
 
 #include "opentyr.h"
-
-#include <SDL2/SDL.h>
 
 #include <stdio.h>
 
@@ -30,11 +27,25 @@
 
 #define DESTRUCT_MODES 5
 
-extern const JE_byte menuHelp[MENU_MAX][11]; /* [1..14, 1..11] */
+extern const JE_byte menuHelp[MENU_MAX][11];   /* [1..14, 1..11] */
 
 extern JE_byte verticalHeight;
 extern JE_byte helpBoxColor, helpBoxBrightness, helpBoxShadeType;
 
+#ifdef TYRIAN2000
+#define HELPTEXT_MISCTEXT_COUNT 72
+#define HELPTEXT_MISCTEXTB_COUNT 8
+#define HELPTEXT_MISCTEXTB_SIZE 12
+#define HELPTEXT_MENUTEXT_SIZE 29
+#define HELPTEXT_MAINMENUHELP_COUNT 37
+#define HELPTEXT_NETWORKTEXT_COUNT 5
+#define HELPTEXT_NETWORKTEXT_SIZE 33
+#define HELPTEXT_SUPERSHIPS_COUNT 13
+#define HELPTEXT_SPECIALNAME_COUNT 11
+#define HELPTEXT_SHIPINFO_COUNT 20
+#define HELPTEXT_MENUINT3_COUNT 9
+#define HELPTEXT_MENUINT12_COUNT 7
+#else
 #define HELPTEXT_MISCTEXT_COUNT 68
 #define HELPTEXT_MISCTEXTB_COUNT 5
 #define HELPTEXT_MISCTEXTB_SIZE 11
@@ -45,6 +56,7 @@ extern JE_byte helpBoxColor, helpBoxBrightness, helpBoxShadeType;
 #define HELPTEXT_SUPERSHIPS_COUNT 11
 #define HELPTEXT_SPECIALNAME_COUNT 9
 #define HELPTEXT_SHIPINFO_COUNT 13
+#endif
 
 extern char helpTxt[39][231];
 extern char pName[21][16];
@@ -68,15 +80,14 @@ extern char destructHelp[25][22];
 extern char weaponNames[17][17];
 extern char destructModeName[DESTRUCT_MODES][13];
 extern char shipInfo[HELPTEXT_SHIPINFO_COUNT][2][256];
-extern char menuInt[MENU_MAX + 1][11][18];
+extern char menuInt[MENU_MAX+1][11][18];
 
-void read_encrypted_pascal_string(char *s, size_t size, FILE *f);
-void skip_pascal_string(FILE *f);
+void read_encrypted_pascal_string( char *s, int size, FILE *f );
+void skip_pascal_string( FILE *f );
 
-void JE_helpBox(SDL_Surface *screen, int x, int y, const char *message,
-                unsigned int boxwidth);
-void JE_HBox(SDL_Surface *screen, int x, int y, unsigned int messagenum,
-             unsigned int boxwidth);
-void JE_loadHelpText(void);
+void JE_helpBox( SDL_Surface *screen, int x, int y, const char *message, unsigned int boxwidth );
+void JE_HBox( SDL_Surface *screen, int x, int y, unsigned int  messagenum, unsigned int boxwidth );
+void JE_loadHelpText( void );
 
 #endif /* HELPTEXT_H */
+

@@ -1,6 +1,6 @@
 /* 
  * OpenTyrian: A modern cross-platform port of Tyrian
- * Copyright (C) 2007-2010  The OpenTyrian Development Team
+ * Copyright (C) 2007-2009  The OpenTyrian Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,27 +16,17 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#ifndef VIDEO_SCALE_H
-#define VIDEO_SCALE_H
+#ifndef SCROLLER_H
+#define SCROLLER_H
 
 #include "opentyr.h"
 
-#include <SDL2/SDL.h>
+extern const struct about_text_type {
+	int effect;
+	const char *text;
+} about_text[];
 
-typedef void (*ScalerFunction)( SDL_Surface *src, SDL_Texture *dst );
+void scroller_sine( const struct about_text_type text[] );
 
-struct Scalers
-{
-	int width, height;
-	ScalerFunction scaler16, scaler32;
-	const char *name;
-};
-
-extern uint scaler;
-extern const struct Scalers scalers[];
-extern const uint scalers_count;
-
-void set_scaler_by_name( const char *name );
-
-#endif /* VIDEO_SCALE_H */
+#endif /* SCROLLER_H */
 

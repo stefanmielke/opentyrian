@@ -19,6 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+
 #include "palette.h"
 #include "video.h"
 
@@ -123,9 +124,9 @@ inline bool diff(unsigned int w1, unsigned int w2)
 {
 	Uint32 YUV1 = yuv_palette[w1];
 	Uint32 YUV2 = yuv_palette[w2];
-	return ( ( abs((int)(YUV1 & Ymask) - (int)(YUV2 & Ymask)) > trY ) ||
-	         ( abs((int)(YUV1 & Umask) - (int)(YUV2 & Umask)) > trU ) ||
-	         ( abs((int)(YUV1 & Vmask) - (int)(YUV2 & Vmask)) > trV ) );
+	return ( ( abs((YUV1 & Ymask) - (YUV2 & Ymask)) > trY ) ||
+	         ( abs((YUV1 & Umask) - (YUV2 & Umask)) > trU ) ||
+	         ( abs((YUV1 & Vmask) - (YUV2 & Vmask)) > trV ) );
 }
 
 
@@ -11914,3 +11915,5 @@ void hq4x_32( SDL_Surface *src_surface, SDL_Texture *dst_texture )
 
 	SDL_UnlockTexture(dst_texture);
 }
+
+// kate: tab-width 4; vim: set noet:

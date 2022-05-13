@@ -16,9 +16,26 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+#include "opentyr.h"
 #include "pcxmast.h"
 
-#include "opentyr.h"
+
+const char *pcxfile[PCX_NUM] = /* [1..PCXnum] */
+{
+	"INTSHPB.PCX",
+	"SETUP2.PCX",
+	"TYRPLAY.PCX",
+	"TYRLOG2.PCX",
+	"P1.PCX",
+	"TYRPLAY2.PCX",
+	"BUC4.PCX",
+	"GMOVR4a.PCX",
+	"GMOVR4b.PCX",
+	"EPICSKY.PCX",
+	"DESTRUCT.PCX",
+	"ECLIPSE.PCX",
+	"FIREPICA.PCX"
+};
 
 const JE_byte pcxpal[PCX_NUM] = /* [1..PCXnum] */
 { 0, 7, 5, 8, 10, 5, 18, 19, 19, 20, 21, 22, 5};
