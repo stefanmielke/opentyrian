@@ -2,9 +2,11 @@
 /build/
 /.vscode/
 
-opentyrian.cfg
-tyrian.cfg
-tyrian.sav
+/filesystem/tyrian21/
+
+*.o
+*.d
+*.z64
 
 # Text editor detritus
 *~

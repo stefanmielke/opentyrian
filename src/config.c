@@ -304,6 +304,10 @@ bool load_opentyrian_config( void )
 
 bool save_opentyrian_config( void )
 {
+#ifdef N64
+	return true;
+#endif
+
 	Config *config = &opentyrian_config;
 	
 	ConfigSection *section;
@@ -342,9 +346,9 @@ bool save_opentyrian_config( void )
 	
 	config_write(config, file);
 	
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
-	fsync(fileno(file));
-#endif
+// #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+// 	fsync(fileno(file));
+// #endif
 	fclose(file);
 	
 	return true;
@@ -750,7 +754,7 @@ const char *get_user_directory( void )
 	
 	if (strlen(user_dir) == 0)
 	{
-#ifndef TARGET_WIN32
+#if !defined(TARGET_WIN32) && !defined(N64)
 		char *xdg_config_home = getenv("XDG_CONFIG_HOME");
 		if (xdg_config_home != NULL)
 		{
@@ -768,6 +772,8 @@ const char *get_user_directory( void )
 				strcpy(user_dir, ".");
 			}
 		}
+#elif defined(N64)
+		strcpy(user_dir, "rom://tyrian21");
 #else
 		strcpy(user_dir, ".");
 #endif
@@ -948,6 +954,10 @@ void JE_loadConfiguration( void )
 
 void JE_saveConfiguration( void )
 {
+#ifdef N64
+	return;
+#endif
+
 	FILE *f;
 	JE_byte *p;
 	int z;
@@ -1027,9 +1037,9 @@ void JE_saveConfiguration( void )
 	{
 		fwrite_die(saveTemp, 1, sizeof(saveTemp), f);
 
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
-		fsync(fileno(f));
-#endif
+// #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+// 		fsync(fileno(f));
+// #endif
 		fclose(f);
 	}
 	
@@ -1059,9 +1069,9 @@ void JE_saveConfiguration( void )
 		
 		fwrite_u8_die(dosKeySettings, 8, f);
 		
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
-		fsync(fileno(f));
-#endif
+// #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+// 		fsync(fileno(f));
+// #endif
 		fclose(f);
 	}
 	

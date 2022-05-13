@@ -34,6 +34,10 @@ bool xmas = false;
 
 bool xmas_time( void )
 {
+#ifdef N64
+	return false;
+#endif
+
 	time_t now = time(NULL);
 	return localtime(&now)->tm_mon == 11;
 }

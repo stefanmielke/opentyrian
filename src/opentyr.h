@@ -24,6 +24,9 @@
 #include <math.h>
 #include <stdbool.h>
 
+#ifdef COUNTOF
+#undef COUNTOF
+#endif
 #define COUNTOF(x) ((unsigned)(sizeof(x) / sizeof *(x)))  // use only on arrays!
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

@@ -81,7 +81,7 @@ FILE *dir_fopen_warn(const char *dir, const char *file, const char *mode) {
   FILE *f = dir_fopen(dir, file, mode);
 
   if (f == NULL)
-    fprintf(stderr, "warning: failed to open '%s': %s\n", file,
+    fprintf(stderr, "warning: failed to open '%s/%s': %s\n", dir, file,
             strerror(errno));
 
   return f;
@@ -92,7 +92,7 @@ FILE *dir_fopen_die(const char *dir, const char *file, const char *mode) {
   FILE *f = dir_fopen(dir, file, mode);
 
   if (f == NULL) {
-    fprintf(stderr, "error: failed to open '%s': %s\n", file, strerror(errno));
+    fprintf(stderr, "error: failed to open '%s/%s': %s\n", dir, file, strerror(errno));
     fprintf(stderr, "error: One or more of the required Tyrian " TYRIAN_VERSION
                     " data files could not be found.\n"
                     "       Please read the README file.\n");

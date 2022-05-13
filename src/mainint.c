@@ -1152,7 +1152,7 @@ void JE_highScoreScreen( void )
 			const JE_SaveFileType *const saveFile = &saveFiles[episodeIndex * 6 + i];
 			const int rank = MIN(saveFile->highScoreDiff, COUNTOF(difficultyNameB) - 1);
 
-			snprintf(buffer, sizeof buffer, "~#%d:~  %d", i + 1, saveFile->highScore1);
+			snprintf(buffer, sizeof buffer, "~#%d:~  %ld", i + 1, saveFile->highScore1);
 			JE_textShade(VGAScreen, 20, y, buffer, 15, 0, FULL_SHADE);
 			JE_textShade(VGAScreen, 110, y, saveFile->highScoreName, 15, 2, FULL_SHADE);
 			JE_textShade(VGAScreen, 250, y, difficultyNameB[rank], 15, rank + (rank == 0 ? 0 : -1), FULL_SHADE);
@@ -1169,7 +1169,7 @@ void JE_highScoreScreen( void )
 			const JE_SaveFileType *const saveFile = &saveFiles[episodeIndex * 6 + 3 + i];
 			const int rank = MIN(saveFile->highScoreDiff, COUNTOF(difficultyNameB) - 1);
 
-			snprintf(buffer, sizeof buffer, "~#%d:~  %d", i + 1, saveFile->highScore1);
+			snprintf(buffer, sizeof buffer, "~#%d:~  %ld", i + 1, saveFile->highScore1);
 			JE_textShade(VGAScreen, 20, y, buffer, 15, 0, FULL_SHADE);
 			JE_textShade(VGAScreen, 110, y, saveFile->highScoreName, 15, 2, FULL_SHADE);
 			JE_textShade(VGAScreen, 250, y, difficultyNameB[rank], 15, rank + (rank == 0 ? 0 : -1), FULL_SHADE);
@@ -2067,7 +2067,7 @@ void JE_highScoreCheck( void )
 						JE_textShade(VGAScreen, 60, 55, miscText[53], 11, 4, FULL_SHADE);
 					}
 
-					sprintf(buffer, "%s %d", miscText[37], temp_score);
+					sprintf(buffer, "%s %ld", miscText[37], temp_score);
 					JE_textShade(VGAScreen, 70, 70, buffer, 11, 4, FULL_SHADE);
 
 					do
@@ -2175,7 +2175,7 @@ void JE_highScoreCheck( void )
 				{
 					if (i != slot)
 					{
-						sprintf(buffer, "~#%d:~  %d", (i - first_slot + 1), saveFiles[i].highScore1);
+						sprintf(buffer, "~#%d:~  %ld", (i - first_slot + 1), saveFiles[i].highScore1);
 						JE_textShade(VGAScreen,  20, ((i - first_slot + 1) * 12) + 65, buffer, 15, 0, FULL_SHADE);
 						JE_textShade(VGAScreen, 150, ((i - first_slot + 1) * 12) + 65, saveFiles[i].highScoreName, 15, 2, FULL_SHADE);
 					}
@@ -2185,7 +2185,7 @@ void JE_highScoreCheck( void )
 
 				fade_palette(colors, 15, 0, 255);
 
-				sprintf(buffer, "~#%d:~  %d", (slot - first_slot + 1), saveFiles[slot].highScore1);
+				sprintf(buffer, "~#%d:~  %ld", (slot - first_slot + 1), saveFiles[slot].highScore1);
 
 				frameCountMax = 6;
 				textGlowFont = TINY_FONT;
@@ -4719,11 +4719,11 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 							shotRepeat[SHOT_SPECIAL2] = 0;
 
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], special[evalue - 32100].name);
 							else if (twoPlayerMode)
-								sprintf(tempStr, "%s %s", miscText[43-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s", miscText[43-1], special[evalue - 32100].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[64-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s", miscText[64-1], special[evalue - 32100].name);
 							JE_drawTextWindow(tempStr);
 							soundQueue[7] = S_POWERUP;
 							enemyAvail[z] = 1;
@@ -4735,9 +4735,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						{
 							enemyAvail[z] = 1;
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], options[evalue - 32000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], options[evalue - 32000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[44-1], options[evalue - 32000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[44-1], options[evalue - 32000].name);
 							JE_drawTextWindow(tempStr);
 
 							// if picked up a different sidekick than player already has, then reset sidekicks to least powerful, else power them up
@@ -4764,7 +4764,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						else if (onePlayerAction)
 						{
 							enemyAvail[z] = 1;
-							sprintf(tempStr, "%s %s", miscText[64-1], options[evalue - 32000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], options[evalue - 32000].name);
 							JE_drawTextWindow(tempStr);
 
 							for (uint i = 0; i < COUNTOF(player[0].items.sidekick); ++i)
@@ -4784,9 +4784,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						if (playerNum_ == 2)
 						{
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], weaponPort[evalue - 31000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], weaponPort[evalue - 31000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[44-1], weaponPort[evalue - 31000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[44-1], weaponPort[evalue - 31000].name);
 							JE_drawTextWindow(tempStr);
 							player[1].items.weapon[REAR_WEAPON].id = evalue - 31000;
 							shotMultiPos[SHOT_REAR] = 0;
@@ -4795,7 +4795,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						}
 						else if (onePlayerAction)
 						{
-							sprintf(tempStr, "%s %s", miscText[64-1], weaponPort[evalue - 31000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], weaponPort[evalue - 31000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[REAR_WEAPON].id = evalue - 31000;
 							shotMultiPos[SHOT_REAR] = 0;
@@ -4811,9 +4811,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						if (playerNum_ == 1 && twoPlayerMode)
 						{
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], weaponPort[evalue - 30000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], weaponPort[evalue - 30000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[43-1], weaponPort[evalue - 30000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[43-1], weaponPort[evalue - 30000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[FRONT_WEAPON].id = evalue - 30000;
 							shotMultiPos[SHOT_FRONT] = 0;
@@ -4822,7 +4822,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						}
 						else if (onePlayerAction)
 						{
-							sprintf(tempStr, "%s %s", miscText[64-1], weaponPort[evalue - 30000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], weaponPort[evalue - 30000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[FRONT_WEAPON].id = evalue - 30000;
 							shotMultiPos[SHOT_FRONT] = 0;
@@ -4892,9 +4892,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 					else if (evalue == -1)  // got front weapon powerup
 					{
 						if (isNetworkGame)
-							sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], miscText[45-1]);
+							snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], miscText[45-1]);
 						else if (twoPlayerMode)
-							sprintf(tempStr, "%s %s", miscText[43-1], miscText[45-1]);
+							snprintf(tempStr, 256, "%s %s", miscText[43-1], miscText[45-1]);
 						else
 							strcpy(tempStr, miscText[45-1]);
 						JE_drawTextWindow(tempStr);
@@ -4905,9 +4905,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 					else if (evalue == -2)  // got rear weapon powerup
 					{
 						if (isNetworkGame)
-							sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], miscText[46-1]);
+							snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], miscText[46-1]);
 						else if (twoPlayerMode)
-							sprintf(tempStr, "%s %s", miscText[44-1], miscText[46-1]);
+							snprintf(tempStr, 256, "%s %s", miscText[44-1], miscText[46-1]);
 						else
 							strcpy(tempStr, miscText[46-1]);
 						JE_drawTextWindow(tempStr);

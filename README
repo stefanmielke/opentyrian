@@ -1,3 +1,22 @@
+# OpenTyrian 64
+
+Port of OpenTyrian to the Nintendo 64.
+
+## Status
+
+For now it only builds and pass the initial loadings, but still can't display anything on the screen. Most likely an issue with how SDL (the port used) creates textures and how the game manipulates them.
+
+Another potential issue is on loading assets, it may end up using more memory than the N64 have (the assets have 12MB). We have to check how it loads assets and change the code to only load when necessary.
+
+## Building
+
+- Clone the repo **with submodules**
+- Download the [data files here](https://camanis.net/tyrian/tyrian21.zip) and unzip them on `/filesystem`. You should have a `/filesystem/tyrian21/[all_files_here]` at the end.
+- Download [libdragon-cli](https://github.com/anacierdem/libdragon-docker) and run `libdragon make` on the root of the project.
+
+
+## ORIGINAL README
+
 OpenTyrian
 ================================================================================
 

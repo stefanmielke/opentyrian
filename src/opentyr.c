@@ -50,6 +50,9 @@
 #include "xmas.h"
 
 #include <SDL2/SDL.h>
+#ifdef N64
+#include <SDL2/SDL_n64.h>
+#endif
 
 #include <assert.h>
 #include <stdio.h>
@@ -737,6 +740,7 @@ int main(int argc, char *argv[]) {
   xmas = xmas_time(); // arg handler may override
 
   JE_paramCheck(argc, argv);
+  audio_disabled = true;
 
   JE_scanForEpisodes();
 
