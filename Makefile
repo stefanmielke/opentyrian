@@ -3,7 +3,7 @@ SOURCE_DIR=src
 BUILD_DIR=build
 include $(N64_INST)/include/n64.mk
 
-N64_CFLAGS += -Ilibs/sdl_n64/lib -fdiagnostics-color=never -D_POSIX_C_SOURCE=0 -DTARGET_N64 -DTYRIAN_DIR='"rom://tyrian21"'
+N64_CFLAGS += -Ilibs/sdl_n64/lib -D_POSIX_C_SOURCE=0 -DTARGET_N64 -DTYRIAN_DIR='"rom://tyrian21"'
 # warnings from original code
 N64_CFLAGS += -Wno-error=format-truncation -Wno-format-truncation -Wno-error=format -Wno-error=array-bounds
 

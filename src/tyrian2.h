@@ -68,5 +68,7 @@ void JE_eventSystem( void );
 
 void draw_boss_bar( void );
 
+void printf_memory( void );
+
 #endif /* TYRIAN2_H */
 

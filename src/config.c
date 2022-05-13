@@ -773,7 +773,7 @@ const char *get_user_directory( void )
 			}
 		}
 #elif defined(N64)
-		strcpy(user_dir, "rom://tyrian21");
+		strcpy(user_dir, "rom://");
 #else
 		strcpy(user_dir, ".");
 #endif
