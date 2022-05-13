@@ -1,0 +1,7 @@
+[submodule "libdragon"]
+	path = libdragon
+	url = https://github.com/DragonMinded/libdragon
+	branch = trunk
+[submodule "libs/sdl_n64"]
+	path = libs/sdl_n64
+	url = https://github.com/stefanmielke/sdl_n64_libdragon
