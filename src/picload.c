@@ -57,9 +57,9 @@ void JE_loadPic(SDL_Surface *screen, JE_byte PCXnumber, JE_boolean storepal )
 	Uint8 *p = buffer;
 	Uint8 *s; /* screen pointer, 8-bit specific */
 
-	s = (Uint8 *)screen->pixels;
+	fprintf(stderr, "Hey %u\n", screen);
 
-	fprintf(stderr, "Hey %u %u\n", s, p);
+	s = (Uint8 *)screen->pixels;
 
 	for (int i = 0; i < vga_width * vga_height; )
 	{
