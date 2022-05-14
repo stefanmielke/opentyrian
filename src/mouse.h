@@ -1,4 +1,4 @@
-/* 
+/*
  * OpenTyrian: A modern cross-platform port of Tyrian
  * Copyright (C) 2007-2009  The OpenTyrian Development Team
  *
@@ -14,14 +14,15 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 #ifndef MOUSE_H
 #define MOUSE_H
 
 #include "opentyr.h"
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 extern bool has_mouse;
 extern bool mouse_has_three_buttons;
@@ -33,11 +34,10 @@ extern JE_word mouseXB, mouseYB;
 
 extern JE_byte mouseGrabShape[24 * 28];
 
-void JE_drawShapeTypeOne( JE_word x, JE_word y, JE_byte *shape );
-void JE_grabShapeTypeOne( JE_word x, JE_word y, JE_byte *shape );
+void JE_drawShapeTypeOne(JE_word x, JE_word y, JE_byte *shape);
+void JE_grabShapeTypeOne(JE_word x, JE_word y, JE_byte *shape);
 
-void JE_mouseStart( void );
-void JE_mouseReplace( void );
+void JE_mouseStart(void);
+void JE_mouseReplace(void);
 
 #endif /* MOUSE_H */
-

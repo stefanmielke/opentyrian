@@ -31,6 +31,8 @@ bool xmas = false;
 
 bool xmas_time( void )
 {
+	return false;
+	
 	time_t now = time(NULL);
 	return localtime(&now)->tm_mon == 11;
 }

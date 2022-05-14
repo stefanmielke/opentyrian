@@ -874,6 +874,8 @@ void JE_loadConfiguration(void) {
 }
 
 void JE_saveConfiguration(void) {
+  return;
+
   FILE *f;
   JE_byte *p;
   int z;

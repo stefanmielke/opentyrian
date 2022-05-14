@@ -23,7 +23,7 @@
 #include "opentyr.h"
 #include "opl.h"
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define SFX_CHANNELS 8
 

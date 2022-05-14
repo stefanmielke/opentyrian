@@ -1,4 +1,4 @@
-/* 
+/*
  * OpenTyrian: A modern cross-platform port of Tyrian
  * Copyright (C) 2007-2009  The OpenTyrian Development Team
  *
@@ -14,12 +14,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 #ifndef OPENTYR_H
 #define OPENTYR_H
 
-#include <SDL2/SDL_types.h>
+#include <SDL.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -30,18 +31,20 @@
 #endif
 #endif
 
-#define COUNTOF(x) ((unsigned)(sizeof(x) / sizeof *(x)))  // use only on arrays!
+#ifndef COUNTOF
+#define COUNTOF(x) ((unsigned)(sizeof(x) / sizeof *(x))) // use only on arrays!
+#endif
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #ifndef M_PI
-#define M_PI    3.14159265358979323846  // pi
+#define M_PI 3.14159265358979323846 // pi
 #endif
 #ifndef M_PI_2
-#define M_PI_2  1.57079632679489661923  // pi/2
+#define M_PI_2 1.57079632679489661923 // pi/2
 #endif
 #ifndef M_PI_4
-#define M_PI_4  0.78539816339744830962  // pi/4
+#define M_PI_4 0.78539816339744830962 // pi/4
 #endif
 
 typedef unsigned int uint;
@@ -50,12 +53,12 @@ typedef unsigned long ulong;
 // Pascal types, yuck.
 typedef Sint32 JE_longint;
 typedef Sint16 JE_integer;
-typedef Sint8  JE_shortint;
+typedef Sint8 JE_shortint;
 typedef Uint16 JE_word;
-typedef Uint8  JE_byte;
-typedef bool   JE_boolean;
-typedef char   JE_char;
-typedef float  JE_real;
+typedef Uint8 JE_byte;
+typedef bool JE_boolean;
+typedef char JE_char;
+typedef float JE_real;
 
 #ifdef TYRIAN2000
 #define TYRIAN_VERSION "2000"
@@ -65,7 +68,8 @@ typedef float  JE_real;
 
 extern const char *opentyrian_str, *opentyrian_version;
 
-void opentyrian_menu( void );
+void opentyrian_menu(void);
+
+void print_memory(void);
 
 #endif /* OPENTYR_H */
-
