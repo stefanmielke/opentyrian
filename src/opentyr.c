@@ -325,10 +325,6 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  print_memory();
-
-  fprintf(stderr, "after init\n");
-
   JE_loadConfiguration();
 
   xmas = NULL; // xmas_time(); // arg handler may override
@@ -337,10 +333,8 @@ int main(int argc, char *argv[]) {
 
   JE_scanForEpisodes();
 
-  print_memory();
-
-  // init_video();
-  // init_keyboard();
+  init_video();
+  init_keyboard();
   init_joysticks();
   printf("assuming mouse detected\n"); // SDL can't tell us if there isn't one
 

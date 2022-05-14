@@ -38,4 +38,5 @@ C_SDL_FILES  += $(wildcard ${SDL2_SOURCE_DIR}/audio/dummy/*.c) \
 
 C_SDL_FILES  += $(wildcard ${SDL2_SOURCE_DIR}/timer/n64/*.c) \
 				$(wildcard ${SDL2_SOURCE_DIR}/joystick/n64/*.c) \
-				$(wildcard ${SDL2_SOURCE_DIR}/video/n64/*.c)
+				$(wildcard ${SDL2_SOURCE_DIR}/video/n64/*.c) \
+				$(wildcard ${SDL2_SOURCE_DIR}/render/n64/*.c)
