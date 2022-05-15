@@ -749,7 +749,7 @@ void openTyrianMenu( void )
 
 int main( int argc, char *argv[] )
 {
-  audio_disabled = true;
+	audio_disabled = true;
 
 	mt_srand(time(NULL));
 

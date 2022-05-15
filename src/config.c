@@ -748,6 +748,9 @@ void JE_decryptSaveTemp( void )
 
 const char *get_user_directory( void )
 {
+#ifdef N64
+	return "rom:/";
+#endif
 	static char user_dir[500] = "";
 	
 	if (strlen(user_dir) == 0)
