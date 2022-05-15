@@ -21,9 +21,9 @@
 
 #include "opentyr.h"
 
-extern JE_boolean inputDetected;
+#include "SDL.h"
 
-JE_boolean JE_buttonPressed( void );
+extern JE_boolean inputDetected;
 
 JE_boolean JE_anyButton( void );
 

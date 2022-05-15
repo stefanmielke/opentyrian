@@ -16,11 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "opentyr.h"
 #include "backgrnd.h"
 
 #include "config.h"
 #include "mtrand.h"
+#include "opentyr.h"
 #include "varz.h"
 #include "video.h"
 
@@ -174,7 +174,7 @@ void draw_background_2( SDL_Surface *surface )
 	
 	if (background2 != 0)
 	{
-		// water effect combines background 1 and 2 by syncronizing the x coordinate
+		// water effect combines background 1 and 2 by synchronizing the x coordinate
 		int x = smoothies[1] ? mapXPos : mapX2Pos;
 		
 		Uint8 **map = (Uint8 **)mapY2Pos + (smoothies[1] ? mapXbpPos : mapX2bpPos) - 12;

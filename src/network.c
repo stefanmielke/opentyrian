@@ -16,13 +16,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+#include "network.h"
+
 #include "episodes.h"
 #include "fonthand.h"
 #include "helptext.h"
 #include "joystick.h"
 #include "keyboard.h"
 #include "mainint.h"
-#include "network.h"
 #include "nortvars.h"
 #include "opentyr.h"
 #include "picload.h"
@@ -40,13 +41,13 @@
  * Hopefully it'll be rewritten some day.
  */
 
-#define NET_VERSION       2            // increment whenever networking changes might create incompatability
+#define NET_VERSION       2            // increment whenever networking changes might create incompatibility
 #define NET_PORT          1333         // UDP
 
 #define NET_PACKET_SIZE   256
 #define NET_PACKET_QUEUE  16
 
-#define NET_RETRY         640          // ticks to wait for packet acknowledgement before resending
+#define NET_RETRY         640          // ticks to wait for packet acknowledgment before resending
 #define NET_RESEND        320          // ticks to wait before requesting unreceived game packet
 #define NET_KEEP_ALIVE    1600         // ticks to wait between keep-alive packets
 #define NET_TIME_OUT      16000        // ticks to wait before considering connection dead
@@ -139,7 +140,7 @@ void network_prepare( Uint16 type )
 	SDLNet_Write16(last_out_sync, &packet_out_temp->data[2]);
 }
 
-// send packet but don't expect acknoledgment of delivery
+// send packet but don't expect acknowledgment of delivery
 static bool network_send_no_ack( int len )
 {
 	packet_out_temp->len = len;
@@ -177,7 +178,7 @@ bool network_send( int len )
 	return temp;
 }
 
-// send acknowledgement packet
+// send acknowledgment packet
 static int network_acknowledge( Uint16 sync )
 {
 	SDLNet_Write16(PACKET_ACKNOWLEDGE, &packet_out_temp->data[0]);
@@ -284,6 +285,7 @@ int network_check( void )
 								packet_in[i] = NULL;
 							}
 						}
+						// fall through
 
 					case PACKET_DETAILS:
 					case PACKET_WAITING:
@@ -305,6 +307,7 @@ int network_check( void )
 						}
 
 						network_acknowledge(SDLNet_Read16(&packet_temp->data[2]));
+						// fall through
 
 					case PACKET_KEEP_ALIVE:
 						last_in_tick = SDL_GetTicks();
@@ -689,7 +692,7 @@ connect_again:
 // something has gone wrong :(
 void network_tyrian_halt( unsigned int err, bool attempt_sync )
 {
-	const char *err_msg[] = {
+	const char *const err_msg[] = {
 		"Quitting...",
 		"Other player quit the game.",
 		"Network connection was lost.",
