@@ -16,12 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "picload.h"
-
 #include "file.h"
 #include "opentyr.h"
 #include "palette.h"
 #include "pcxmast.h"
+#include "picload.h"
 #include "video.h"
 
 #include <string.h>
@@ -39,9 +38,12 @@ void JE_loadPic(SDL_Surface *screen, JE_byte PCXnumber, JE_boolean storepal )
 		first = false;
 
 		Uint16 temp;
-		fread_u16_die(&temp, 1, f);
+		efread(&temp, sizeof(Uint16), 1, f);
+		for (int i = 0; i < PCX_NUM; i++)
+		{
+			efread(&pcxpos[i], sizeof(JE_longint), 1, f);
+		}
 
-		fread_s32_die(pcxpos, PCX_NUM, f);
 		pcxpos[PCX_NUM] = ftell_eof(f);
 	}
 
@@ -49,7 +51,7 @@ void JE_loadPic(SDL_Surface *screen, JE_byte PCXnumber, JE_boolean storepal )
 	Uint8 *buffer = malloc(size);
 
 	fseek(f, pcxpos[PCXnumber], SEEK_SET);
-	fread_u8_die(buffer, size, f);
+	efread(buffer, sizeof(Uint8), size, f);
 	fclose(f);
 
 	Uint8 *p = buffer;
@@ -57,23 +59,21 @@ void JE_loadPic(SDL_Surface *screen, JE_byte PCXnumber, JE_boolean storepal )
 
 	s = (Uint8 *)screen->pixels;
 
-	for (int i = 0; i < 320 * 200; )
+	for (int i = 0; i < vga_width * vga_height; )
 	{
 		if ((*p & 0xc0) == 0xc0)
 		{
 			i += (*p & 0x3f);
 			memset(s, *(p + 1), (*p & 0x3f));
 			s += (*p & 0x3f); p += 2;
-		}
-		else
-		{
+		} else {
 			i++;
 			*s = *p;
 			s++; p++;
 		}
-		if (i && (i % 320 == 0))
+		if (i && (i % vga_width == 0))
 		{
-			s += screen->pitch - 320;
+			s += screen->pitch - vga_width;
 		}
 	}
 

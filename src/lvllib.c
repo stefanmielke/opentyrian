@@ -16,9 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "lvllib.h"
-
 #include "file.h"
+#include "lvllib.h"
 #include "opentyr.h"
 
 JE_LvlPosType lvlPos;
@@ -30,9 +29,10 @@ void JE_analyzeLevel( void )
 {
 	FILE *f = dir_fopen_die(data_dir(), levelFile, "rb");
 	
-	fread_u16_die(&lvlNum, 1, f);
-
-	fread_s32_die(lvlPos, lvlNum, f);
+	efread(&lvlNum, sizeof(JE_word), 1, f);
+	
+	for (int x = 0; x < lvlNum; x++)
+		efread(&lvlPos[x], sizeof(JE_longint), 1, f);
 	
 	lvlPos[lvlNum] = ftell_eof(f);
 	

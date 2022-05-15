@@ -14,19 +14,17 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 #include "keyboard.h"
-
 #include "joystick.h"
-#include "mouse.h"
 #include "network.h"
 #include "opentyr.h"
 #include "video.h"
 #include "video_scale.h"
 
-#include "SDL.h"
-
+#include <SDL.h>
 #include <stdio.h>
 
 JE_boolean ESCPressed;
@@ -34,228 +32,200 @@ JE_boolean ESCPressed;
 JE_boolean newkey, newmouse, keydown, mousedown;
 SDL_Scancode lastkey_scan;
 SDL_Keymod lastkey_mod;
+unsigned char lastkey_char;
 Uint8 lastmouse_but;
-Sint32 lastmouse_x, lastmouse_y;
+Uint16 lastmouse_x, lastmouse_y;
 JE_boolean mouse_pressed[3] = {false, false, false};
-Sint32 mouse_x, mouse_y;
-
-bool windowHasFocus;
+Uint16 mouse_x, mouse_y;
 
 Uint8 keysactive[SDL_NUM_SCANCODES];
 
-bool new_text;
-char last_text[SDL_TEXTINPUTEVENT_TEXT_SIZE];
+#ifdef NDEBUG
+bool input_grab_enabled = true;
+#else
+bool input_grab_enabled = false;
+#endif
 
-static bool mouseRelativeEnabled;
+void flush_events_buffer(void) {
+  SDL_Event ev;
 
-// Relative mouse position in window coordinates.
-static Sint32 mouseWindowXRelative;
-static Sint32 mouseWindowYRelative;
-
-void flush_events_buffer( void )
-{
-	SDL_Event ev;
-
-	while (SDL_PollEvent(&ev));
+  while (SDL_PollEvent(&ev))
+    ;
 }
 
-void wait_input( JE_boolean keyboard, JE_boolean mouse, JE_boolean joystick )
-{
-	service_SDL_events(false);
-	while (!((keyboard && keydown) || (mouse && mousedown) || (joystick && joydown)))
-	{
-		SDL_Delay(SDL_POLL_INTERVAL);
-		push_joysticks_as_keyboard();
-		service_SDL_events(false);
+void wait_input(JE_boolean keyboard, JE_boolean mouse, JE_boolean joystick) {
+  service_SDL_events(false);
+  while (!((keyboard && keydown) || (mouse && mousedown) ||
+           (joystick && joydown))) {
+    SDL_Delay(SDL_POLL_INTERVAL);
+    push_joysticks_as_keyboard();
+    service_SDL_events(false);
 
 #ifdef WITH_NETWORK
-		if (isNetworkGame)
-			network_check();
+    if (isNetworkGame)
+      network_check();
 #endif
-	}
+  }
 }
 
-void wait_noinput( JE_boolean keyboard, JE_boolean mouse, JE_boolean joystick )
-{
-	service_SDL_events(false);
-	while ((keyboard && keydown) || (mouse && mousedown) || (joystick && joydown))
-	{
-		SDL_Delay(SDL_POLL_INTERVAL);
-		poll_joysticks();
-		service_SDL_events(false);
+void wait_noinput(JE_boolean keyboard, JE_boolean mouse, JE_boolean joystick) {
+  service_SDL_events(false);
+  while ((keyboard && keydown) || (mouse && mousedown) ||
+         (joystick && joydown)) {
+    SDL_Delay(SDL_POLL_INTERVAL);
+    poll_joysticks();
+    service_SDL_events(false);
 
 #ifdef WITH_NETWORK
-		if (isNetworkGame)
-			network_check();
+    if (isNetworkGame)
+      network_check();
 #endif
-	}
+  }
 }
 
-void init_keyboard( void )
-{
-	//SDL_EnableKeyRepeat(500, 60); TODO Find if SDL2 has an equivalent.
+void init_keyboard(void) {
+  // SDL_EnableKeyRepeat(500, 60); TODO Find if SDL2 has an equivalent.
 
-	newkey = newmouse = false;
-	keydown = mousedown = false;
-
-	SDL_ShowCursor(SDL_FALSE);
+  newkey = newmouse = false;
+  keydown = mousedown = false;
 }
 
-void mouseSetRelative(bool enable)
-{
-	SDL_SetRelativeMouseMode(enable && windowHasFocus);
+void input_grab(bool enable) {
+#if defined(TARGET_GP2X) || defined(TARGET_DINGUX)
+  enable = true;
+#endif
 
-	mouseRelativeEnabled = enable;
+  input_grab_enabled = enable || fullscreen_display != -1;
 
-	mouseWindowXRelative = 0;
-	mouseWindowYRelative = 0;
+  SDL_ShowCursor(input_grab_enabled ? SDL_DISABLE : SDL_ENABLE);
+#ifdef NDEBUG
+  SDL_SetWindowGrab(main_window, input_grab_enabled ? SDL_TRUE : SDL_FALSE);
+#endif
 }
 
-JE_word JE_mousePosition( JE_word *mouseX, JE_word *mouseY )
-{
-	service_SDL_events(false);
-	*mouseX = mouse_x;
-	*mouseY = mouse_y;
-	return mousedown ? lastmouse_but : 0;
+JE_word JE_mousePosition(JE_word *mouseX, JE_word *mouseY) {
+  service_SDL_events(false);
+  *mouseX = mouse_x;
+  *mouseY = mouse_y;
+  return mousedown ? lastmouse_but : 0;
 }
 
-void mouseGetRelativePosition(Sint32 *const out_x, Sint32 *const out_y)
-{
-	service_SDL_events(false);
-
-	scaleWindowDistanceToScreen(&mouseWindowXRelative, &mouseWindowYRelative);
-	*out_x = mouseWindowXRelative;
-	*out_y = mouseWindowYRelative;
-
-	mouseWindowXRelative = 0;
-	mouseWindowYRelative = 0;
+void set_mouse_position(int x, int y) {
+  if (input_grab_enabled) {
+    mouse_x = x;
+    mouse_y = y;
+    map_screen_to_window_pos(&x, &y);
+    SDL_WarpMouseInWindow(main_window, x, y);
+  }
 }
 
-void service_SDL_events( JE_boolean clear_new )
-{
-	SDL_Event ev;
+void service_SDL_events(JE_boolean clear_new) {
+  SDL_Event ev;
 
-	if (clear_new)
-	{
-		newkey = false;
-		newmouse = false;
-		new_text = false;
-	}
+  if (clear_new)
+    newkey = newmouse = false;
 
-	while (SDL_PollEvent(&ev))
-	{
-		switch (ev.type)
-		{
-			case SDL_WINDOWEVENT:
-				switch (ev.window.event)
-				{
-				case SDL_WINDOWEVENT_FOCUS_LOST:
-					windowHasFocus = false;
+  while (SDL_PollEvent(&ev)) {
+    switch (ev.type) {
+    case SDL_WINDOWEVENT:
+      if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+        input_grab(false);
+      else if (ev.window.event == SDL_WINDOWEVENT_RESIZED)
+        video_on_win_resize();
+      break;
 
-					mouseSetRelative(mouseRelativeEnabled);
-					break;
+    case SDL_MOUSEMOTION:
+      // map_window_to_screen_pos(&ev.motion.x, &ev.motion.y);
+      // if (ev.motion.x < 0) {
+      // 	ev.motion.x = 0;
+      // } else if (ev.motion.x >= vga_width) {
+      // 	ev.motion.x = vga_width - 1;
+      // }
 
-				case SDL_WINDOWEVENT_FOCUS_GAINED:
-					windowHasFocus = true;
+      // if (ev.motion.y < 0) {
+      // 	ev.motion.y = 0;
+      // } else if (ev.motion.y >= vga_width) {
+      // 	ev.motion.y = vga_width - 1;
+      // }
+      // mouse_x = ev.motion.x;
+      // mouse_y = ev.motion.y;
+      break;
+    case SDL_KEYDOWN:
+      if (ev.key.keysym.mod & KMOD_CTRL) {
+        /* <ctrl><bksp> emergency kill */
+        if (ev.key.keysym.scancode == SDL_SCANCODE_BACKSPACE) {
+          puts("\n\n\nCtrl+Backspace pressed. Doing emergency quit.\n");
+          SDL_Quit();
+          exit(1);
+        }
 
-					mouseSetRelative(mouseRelativeEnabled);
-					break;
+        /* <ctrl><f10> toggle input grab */
+        if (ev.key.keysym.scancode == SDL_SCANCODE_F10) {
+          input_grab(!input_grab_enabled);
+          break;
+        }
+      }
 
-				case SDL_WINDOWEVENT_RESIZED:
-					video_on_win_resize();
-					break;
-				}
-				break;
+      /* <alt><enter> toggle fullscreen */
+      if (ev.key.keysym.mod & KMOD_ALT &&
+          ev.key.keysym.scancode == SDL_SCANCODE_RETURN) {
+        toggle_fullscreen();
+        input_grab(false);
+        break;
+      }
 
-			case SDL_KEYDOWN:
-				/* <alt><enter> toggle fullscreen */
-				if (ev.key.keysym.mod & KMOD_ALT && ev.key.keysym.scancode == SDL_SCANCODE_RETURN)
-				{
-					toggle_fullscreen();
-					break;
-				}
+      keysactive[ev.key.keysym.scancode] = 1;
 
-				keysactive[ev.key.keysym.scancode] = 1;
-
-				newkey = true;
-				lastkey_scan = ev.key.keysym.scancode;
-				lastkey_mod = ev.key.keysym.mod;
-				keydown = true;
-
-				mouseInactive = true;
-				return;
-
-			case SDL_KEYUP:
-				keysactive[ev.key.keysym.scancode] = 0;
-				keydown = false;
-				return;
-
-			case SDL_MOUSEMOTION:
-				mouse_x = ev.motion.x;
-				mouse_y = ev.motion.y;
-				mapWindowPointToScreen(&mouse_x, &mouse_y);
-
-				if (mouseRelativeEnabled && windowHasFocus)
-				{
-					mouseWindowXRelative += ev.motion.xrel;
-					mouseWindowYRelative += ev.motion.yrel;
-				}
-
-				// Show system mouse pointer if outside screen.
-				SDL_ShowCursor(mouse_x < 0 || mouse_x >= vga_width ||
-				               mouse_y < 0 || mouse_y >= vga_height ? SDL_TRUE : SDL_FALSE);
-
-				if (ev.motion.xrel != 0 || ev.motion.yrel != 0)
-					mouseInactive = false;
-				break;
-
-			case SDL_MOUSEBUTTONDOWN:
-				mouseInactive = false;
-
-				// fall through
-			case SDL_MOUSEBUTTONUP:
-				mapWindowPointToScreen(&ev.button.x, &ev.button.y);
-				if (ev.type == SDL_MOUSEBUTTONDOWN)
-				{
-					newmouse = true;
-					lastmouse_but = ev.button.button;
-					lastmouse_x = ev.button.x;
-					lastmouse_y = ev.button.y;
-					mousedown = true;
-				}
-				else
-				{
-					mousedown = false;
-				}
-				switch (ev.button.button)
-				{
-					case SDL_BUTTON_LEFT:
-						mouse_pressed[0] = mousedown; break;
-					case SDL_BUTTON_RIGHT:
-						mouse_pressed[1] = mousedown; break;
-					case SDL_BUTTON_MIDDLE:
-						mouse_pressed[2] = mousedown; break;
-				}
-				break;
-
-			case SDL_TEXTINPUT:
-				SDL_strlcpy(last_text, ev.text.text, COUNTOF(last_text));
-				new_text = true;
-				break;
-
-			case SDL_TEXTEDITING:
-				break;
-
-			case SDL_QUIT:
-				/* TODO: Call the cleanup code here. */
-				exit(0);
-				break;
-		}
-	}
+      newkey = true;
+      lastkey_scan = ev.key.keysym.scancode;
+      lastkey_mod = ev.key.keysym.mod;
+      if (ev.key.keysym.sym & SDLK_SCANCODE_MASK) {
+        lastkey_char = 0;
+      } else {
+        lastkey_char = ev.key.keysym.sym & ~SDLK_SCANCODE_MASK;
+      }
+      keydown = true;
+      return;
+    case SDL_KEYUP:
+      keysactive[ev.key.keysym.scancode] = 0;
+      keydown = false;
+      return;
+    case SDL_MOUSEBUTTONDOWN:
+      if (!input_grab_enabled) {
+        input_grab(true);
+        break;
+      }
+      // intentional fall-though
+    case SDL_MOUSEBUTTONUP:
+      if (ev.type == SDL_MOUSEBUTTONDOWN) {
+        newmouse = true;
+        lastmouse_but = ev.button.button;
+        lastmouse_x = ev.button.x * vga_width / scalers[scaler].width;
+        lastmouse_y = ev.button.y * vga_height / scalers[scaler].height;
+        mousedown = true;
+      } else {
+        mousedown = false;
+      }
+      switch (ev.button.button) {
+      case SDL_BUTTON_LEFT:
+        mouse_pressed[0] = mousedown;
+        break;
+      case SDL_BUTTON_RIGHT:
+        mouse_pressed[1] = mousedown;
+        break;
+      case SDL_BUTTON_MIDDLE:
+        mouse_pressed[2] = mousedown;
+        break;
+      }
+      break;
+    case SDL_QUIT:
+      /* TODO: Call the cleanup code here. */
+      exit(0);
+      break;
+    }
+  }
 }
 
-void JE_clearKeyboard( void )
-{
-	// /!\ Doesn't seems important. I think. D:
+void JE_clearKeyboard(void) {
+  // /!\ Doesn't seems important. I think. D:
 }
-

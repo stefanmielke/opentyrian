@@ -16,11 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "joystick.h"
-
 #include "config.h"
 #include "config_file.h"
 #include "file.h"
+#include "joystick.h"
 #include "keyboard.h"
 #include "nortsong.h"
 #include "opentyr.h"
@@ -189,7 +188,7 @@ void poll_joystick( int j )
 	{
 		bool old = joystick[j].action[d];
 		
-		joystick[j].action[d] = check_assigned(joystick[j].handle, joystick[j].assignment[d + COUNTOF(joystick[j].direction)]) > (joystick_analog_max / 2);
+		joystick[j].action[d] = check_assigned(joystick[j].handle, joystick[j].assignment[d + COUNTOF(joystick[j].direction)]);
 		joydown |= joystick[j].action[d];
 		
 		joystick[j].action_pressed[d] = joystick[j].action[d] && (!old || repeat);
@@ -343,7 +342,14 @@ void reset_joystick_assignments( int j )
 				joystick[j].assignment[a][1].x_axis = (a == 1 || a == 3);
 				joystick[j].assignment[a][1].negative_axis = (a == 0 || a == 3);
 			}
+#ifdef VITA
+			static const char remap[4] = { 8, 9, 6, 7 }; // maps to correct button (UP, RIGHT, DOWN, LEFT)
+
+			joystick[j].assignment[a][1].type = BUTTON;
+			joystick[j].assignment[a][1].num = remap[a];
+#endif
 		}
+#ifndef VITA
 		else
 		{
 			if (a - 4 < (unsigned)SDL_JoystickNumButtons(joystick[j].handle))
@@ -352,8 +358,29 @@ void reset_joystick_assignments( int j )
 				joystick[j].assignment[a][0].num = a - 4;
 			}
 		}
+#endif
 	}
-	
+
+#ifdef VITA
+	joystick[j].assignment[4][0].type = BUTTON;
+	joystick[j].assignment[4][0].num = 2; // X (fire)
+
+	joystick[j].assignment[5][0].type = BUTTON;
+	joystick[j].assignment[5][0].num = 1; // O (change fire)
+
+	joystick[j].assignment[6][0].type = BUTTON;
+	joystick[j].assignment[6][0].num = 4; // L (left sidekick)
+
+	joystick[j].assignment[7][0].type = BUTTON;
+	joystick[j].assignment[7][0].num = 5; // R (right sidekick)
+
+	joystick[j].assignment[8][0].type = BUTTON;
+	joystick[j].assignment[8][0].num = 10; // SELECT (menu)
+
+	joystick[j].assignment[9][0].type = BUTTON;
+	joystick[j].assignment[9][0].num = 11; // START (pause)
+#endif
+
 	joystick[j].analog = false;
 	joystick[j].sensitivity = 5;
 	joystick[j].threshold = 5;
@@ -373,9 +400,9 @@ static const char* const assignment_names[] =
 	"pause",
 };
 
-bool load_joystick_assignments( Config *config, int j )
+bool load_joystick_assignments( config_t *config, int j )
 {
-	ConfigSection *section = config_find_section(config, "joystick", SDL_JoystickName(joystick[j].handle));
+	config_section_t *section = config_find_section(config, "joystick", SDL_JoystickName(joystick[j].handle));
 	if (section == NULL)
 		return false;
 	
@@ -391,7 +418,7 @@ bool load_joystick_assignments( Config *config, int j )
 		for (unsigned int i = 0; i < COUNTOF(joystick[j].assignment[a]); ++i)
 			joystick[j].assignment[a][i].type = NONE;
 		
-		ConfigOption *option = config_get_option(section, assignment_names[a]);
+		config_option_t *option = config_get_option(section, assignment_names[a]);
 		if (option == NULL)
 			continue;
 		
@@ -407,9 +434,9 @@ bool load_joystick_assignments( Config *config, int j )
 	return true;
 }
 
-bool save_joystick_assignments( Config *config, int j )
+bool save_joystick_assignments( config_t *config, int j )
 {
-	ConfigSection *section = config_find_or_add_section(config, "joystick", SDL_JoystickName(joystick[j].handle));
+	config_section_t *section = config_find_or_add_section(config, "joystick", SDL_JoystickName(joystick[j].handle));
 	if (section == NULL)
 		exit(EXIT_FAILURE);  // out of memory
 	
@@ -421,7 +448,7 @@ bool save_joystick_assignments( Config *config, int j )
 	
 	for (size_t a = 0; a < COUNTOF(assignment_names); ++a)
 	{
-		ConfigOption *option = config_set_option(section, assignment_names[a], NULL);
+		config_option_t *option = config_set_option(section, assignment_names[a], NULL);
 		if (option == NULL)
 			exit(EXIT_FAILURE);  // out of memory
 		

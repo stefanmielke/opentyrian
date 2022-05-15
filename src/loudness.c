@@ -204,11 +204,11 @@ void load_music( void )
 	{
 		music_file = dir_fopen_die(data_dir(), "music.mus", "rb");
 		
-		fread_u16_die(&song_count, 1, music_file);
+		efread(&song_count, 1, 16, music_file); 
 		
 		song_offset = malloc((song_count + 1) * sizeof(*song_offset));
 		
-		fread_u32_die(song_offset, song_count, music_file);
+		efread(song_offset, song_count, 32, music_file); 
 
 		song_offset[song_count] = ftell_eof(music_file);
 	}

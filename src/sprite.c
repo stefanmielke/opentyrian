@@ -16,10 +16,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "sprite.h"
-
 #include "file.h"
 #include "opentyr.h"
+#include "sprite.h"
 #include "video.h"
 
 #include <assert.h>
@@ -28,20 +27,8 @@
 
 Sprite_array sprite_table[SPRITE_TABLES_MAX];
 
-Sprite2_array shopSpriteSheet;
-
-Sprite2_array explosionSpriteSheet;
-
-Sprite2_array enemySpriteSheets[4];
-Uint8 enemySpriteSheetIds[4];
-
-Sprite2_array destructSpriteSheet;
-
-Sprite2_array spriteSheet8;
-Sprite2_array spriteSheet9;
-Sprite2_array spriteSheet10;
-Sprite2_array spriteSheet11;
-Sprite2_array spriteSheet12;
+Sprite2_array eShapes[6];
+Sprite2_array shapesC1, shapes6, shapes9, shapesW2;
 
 void load_sprites_file( unsigned int table, const char *filename )
 {
@@ -59,7 +46,7 @@ void load_sprites( unsigned int table, FILE *f )
 	free_sprites(table);
 	
 	Uint16 temp;
-	fread_u16_die(&temp, 1, f);
+	efread(&temp, sizeof(Uint16), 1, f);
 	
 	sprite_table[table].count = temp;
 	
@@ -68,19 +55,17 @@ void load_sprites( unsigned int table, FILE *f )
 	for (unsigned int i = 0; i < sprite_table[table].count; ++i)
 	{
 		Sprite * const cur_sprite = sprite(table, i);
-
-		bool populated;
-		fread_bool_die(&populated, f);
-		if (!populated) // sprite is empty
+		
+		if (!getc(f)) // sprite is empty
 			continue;
 		
-		fread_u16_die(&cur_sprite->width,  1, f);
-		fread_u16_die(&cur_sprite->height, 1, f);
-		fread_u16_die(&cur_sprite->size,   1, f);
+		efread(&cur_sprite->width,  sizeof(Uint16), 1, f);
+		efread(&cur_sprite->height, sizeof(Uint16), 1, f);
+		efread(&cur_sprite->size,   sizeof(Uint16), 1, f);
 		
 		cur_sprite->data = malloc(cur_sprite->size);
 		
-		fread_u8_die(cur_sprite->data, cur_sprite->size, f);
+		efread(cur_sprite->data, sizeof(Uint8), cur_sprite->size, f);
 	}
 }
 
@@ -484,8 +469,6 @@ void blit_sprite_dark( SDL_Surface *surface, int x, int y, unsigned int table, u
 
 void JE_loadCompShapes( Sprite2_array *sprite2s, char s )
 {
-	free_sprite2s(sprite2s);
-
 	char buffer[20];
 	snprintf(buffer, sizeof(buffer), "newsh%c.shp", tolower((unsigned char)s));
 	
@@ -500,18 +483,16 @@ void JE_loadCompShapes( Sprite2_array *sprite2s, char s )
 
 void JE_loadCompShapesB( Sprite2_array *sprite2s, FILE *f )
 {
-	assert(sprite2s->data == NULL);
-
-	sprite2s->data = malloc(sprite2s->size);
-	fread_u8_die(sprite2s->data, sprite2s->size, f);
+	free_sprite2s(sprite2s);
+	
+	sprite2s->data = malloc(sizeof(Uint8) * sprite2s->size);
+	efread(sprite2s->data, sizeof(Uint8), sprite2s->size, f);
 }
 
 void free_sprite2s( Sprite2_array *sprite2s )
 {
 	free(sprite2s->data);
 	sprite2s->data = NULL;
-
-	sprite2s->size = 0;
 }
 
 // does not clip on left or right edges of surface
@@ -546,48 +527,6 @@ void blit_sprite2( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, u
 				
 				++pixels;
 			}
-		}
-	}
-}
-
-void blit_sprite2_clip( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index )
-{
-	assert(surface->format->BitsPerPixel == 8);
-
-	const Uint8 *data = sprite2s.data + SDL_SwapLE16(((Uint16 *)sprite2s.data)[index - 1]);
-
-	for (; *data != 0x0f; ++data)
-	{
-		if (y >= surface->h)
-			return;
-
-		Uint8 skip_count = *data & 0x0f;
-		Uint8 fill_count = (*data >> 4) & 0x0f;
-
-		x += skip_count;
-
-		if (fill_count == 0) // move to next pixel row
-		{
-			y += 1;
-			x -= 12;
-		}
-		else if (y >= 0)
-		{
-			Uint8 *const pixel_row = (Uint8 *)surface->pixels + (y * surface->pitch);
-			do
-			{
-				++data;
-
-				if (x >= 0 && x < surface->pitch)
-					pixel_row[x] = *data;
-				x += 1;
-			}
-			while (--fill_count);
-		}
-		else
-		{
-			data += fill_count;
-			x += fill_count;
 		}
 	}
 }
@@ -700,48 +639,6 @@ void blit_sprite2_filter( SDL_Surface *surface, int x, int y, Sprite2_array spri
 	}
 }
 
-void blit_sprite2_filter_clip( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index, Uint8 filter )
-{
-	assert(surface->format->BitsPerPixel == 8);
-
-	const Uint8 *data = sprite2s.data + SDL_SwapLE16(((Uint16 *)sprite2s.data)[index - 1]);
-
-	for (; *data != 0x0f; ++data)
-	{
-		if (y >= surface->h)
-			return;
-
-		Uint8 skip_count = *data & 0x0f;
-		Uint8 fill_count = (*data >> 4) & 0x0f;
-
-		x += skip_count;
-
-		if (fill_count == 0) // move to next pixel row
-		{
-			y += 1;
-			x -= 12;
-		}
-		else if (y >= 0)
-		{
-			Uint8 *const pixel_row = (Uint8 *)surface->pixels + (y * surface->pitch);
-			do
-			{
-				++data;
-
-				if (x >= 0 && x < surface->pitch)
-					pixel_row[x] = filter | (*data & 0x0f);;
-				x += 1;
-			}
-			while (--fill_count);
-		}
-		else
-		{
-			data += fill_count;
-			x += fill_count;
-		}
-	}
-}
-
 // does not clip on left or right edges of surface
 void blit_sprite2x2( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index )
 {
@@ -749,14 +646,6 @@ void blit_sprite2x2( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s,
 	blit_sprite2(surface, x + 12, y,      sprite2s, index + 1);
 	blit_sprite2(surface, x,      y + 14, sprite2s, index + 19);
 	blit_sprite2(surface, x + 12, y + 14, sprite2s, index + 20);
-}
-
-void blit_sprite2x2_clip( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index )
-{
-	blit_sprite2_clip(surface, x,      y,      sprite2s, index);
-	blit_sprite2_clip(surface, x + 12, y,      sprite2s, index + 1);
-	blit_sprite2_clip(surface, x,      y + 14, sprite2s, index + 19);
-	blit_sprite2_clip(surface, x + 12, y + 14, sprite2s, index + 20);
 }
 
 // does not clip on left or right edges of surface
@@ -777,37 +666,25 @@ void blit_sprite2x2_darken( SDL_Surface *surface, int x, int y, Sprite2_array sp
 	blit_sprite2_darken(surface, x + 12, y + 14, sprite2s, index + 20);
 }
 
-// does not clip on left or right edges of surface
-void blit_sprite2x2_filter( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index, Uint8 filter )
-{
-	blit_sprite2_filter(surface, x,      y,      sprite2s, index, filter);
-	blit_sprite2_filter(surface, x + 12, y,      sprite2s, index + 1, filter);
-	blit_sprite2_filter(surface, x,      y + 14, sprite2s, index + 19, filter);
-	blit_sprite2_filter(surface, x + 12, y + 14, sprite2s, index + 20, filter);
-}
-
-void blit_sprite2x2_filter_clip( SDL_Surface *surface, int x, int y, Sprite2_array sprite2s, unsigned int index, Uint8 filter )
-{
-	blit_sprite2_filter_clip(surface, x,      y,      sprite2s, index, filter);
-	blit_sprite2_filter_clip(surface, x + 12, y,      sprite2s, index + 1, filter);
-	blit_sprite2_filter_clip(surface, x,      y + 14, sprite2s, index + 19, filter);
-	blit_sprite2_filter_clip(surface, x + 12, y + 14, sprite2s, index + 20, filter);
-}
-
 
 void JE_loadMainShapeTables( const char *shpfile )
 {
+#ifdef TYRIAN2000
+	enum { SHP_NUM = 13 };
+#else
 	enum { SHP_NUM = 12 };
+#endif
 	
 	FILE *f = dir_fopen_die(data_dir(), shpfile, "rb");
 	
 	JE_word shpNumb;
 	JE_longint shpPos[SHP_NUM + 1]; // +1 for storing file length
 	
-	fread_u16_die(&shpNumb, 1, f);
+	efread(&shpNumb, sizeof(JE_word), 1, f);
 	assert(shpNumb + 1u == COUNTOF(shpPos));
 	
-	fread_s32_die(shpPos, shpNumb, f);
+	for (unsigned int i = 0; i < shpNumb; ++i)
+		efread(&shpPos[i], sizeof(JE_longint), 1, f);
 	
 	fseek(f, 0, SEEK_END);
 	for (unsigned int i = shpNumb; i < COUNTOF(shpPos); ++i)
@@ -822,28 +699,28 @@ void JE_loadMainShapeTables( const char *shpfile )
 	}
 	
 	// player shot sprites
-	spriteSheet8.size = shpPos[i + 1] - shpPos[i];
-	JE_loadCompShapesB(&spriteSheet8, f);
+	shapesC1.size = shpPos[i + 1] - shpPos[i];
+	JE_loadCompShapesB(&shapesC1, f);
 	i++;
 	
 	// player ship sprites
-	spriteSheet9.size = shpPos[i + 1] - shpPos[i];
-	JE_loadCompShapesB(&spriteSheet9 , f);
+	shapes9.size = shpPos[i + 1] - shpPos[i];
+	JE_loadCompShapesB(&shapes9 , f);
 	i++;
 	
 	// power-up sprites
-	spriteSheet10.size = shpPos[i + 1] - shpPos[i];
-	JE_loadCompShapesB(&spriteSheet10, f);
+	eShapes[5].size = shpPos[i + 1] - shpPos[i];
+	JE_loadCompShapesB(&eShapes[5], f);
 	i++;
 	
 	// coins, datacubes, etc sprites
-	spriteSheet11.size = shpPos[i + 1] - shpPos[i];
-	JE_loadCompShapesB(&spriteSheet11, f);
+	eShapes[4].size = shpPos[i + 1] - shpPos[i];
+	JE_loadCompShapesB(&eShapes[4], f);
 	i++;
 	
 	// more player shot sprites
-	spriteSheet12.size = shpPos[i + 1] - shpPos[i];
-	JE_loadCompShapesB(&spriteSheet12, f);
+	shapesW2.size = shpPos[i + 1] - shpPos[i];
+	JE_loadCompShapesB(&shapesW2, f);
 	
 	fclose(f);
 }
@@ -853,9 +730,9 @@ void free_main_shape_tables( void )
 	for (uint i = 0; i < COUNTOF(sprite_table); ++i)
 		free_sprites(i);
 	
-	free_sprite2s(&spriteSheet8);
-	free_sprite2s(&spriteSheet9);
-	free_sprite2s(&spriteSheet10);
-	free_sprite2s(&spriteSheet11);
-	free_sprite2s(&spriteSheet12);
+	free_sprite2s(&shapesC1);
+	free_sprite2s(&shapes9);
+	free_sprite2s(&eShapes[5]);
+	free_sprite2s(&eShapes[4]);
+	free_sprite2s(&shapesW2);
 }

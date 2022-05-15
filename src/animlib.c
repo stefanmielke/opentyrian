@@ -17,7 +17,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 #include "animlib.h"
-
 #include "file.h"
 #include "keyboard.h"
 #include "network.h"
@@ -42,21 +41,21 @@
 #define ANI_PAGE_SIZE 0x10000   // 65536.
 typedef struct anim_FileHeader_s
 {
-	Uint16 nlps;            /* Number of 'pages', max 256. */
-	Uint32 nRecords;        /* Number of 'records', max 65535 */
+	unsigned int nlps;            /* Number of 'pages', max 256. */
+	unsigned int nRecords;        /* Number of 'records', max 65535 */
 } anim_FileHeader_t;
 typedef struct anim_LargePageHeader_s
 {
-	Uint16 baseRecord;      /* The first record's number */
-	Uint16 nRecords;        /* Number of records.  Supposedly there are bit flags but I saw no such code */
-	Uint16 nBytes;	        /* Number of bytes used, excluding headers */
+	unsigned int baseRecord;      /* The first record's number */
+	unsigned int nRecords;        /* Number of records.  Supposedly there are bit flags but I saw no such code */
+	unsigned int nBytes;	      /* Number of bytes used, excluding headers */
 } anim_LargePageHeader_t;
 
 
 /*** Globals ***/
 Uint8 CurrentPageBuffer[65536];
 anim_LargePageHeader_t PageHeader[256];
-Uint16 CurrentPageRecordSizes[256];
+unsigned int CurrentPageRecordSizes[256];
 
 anim_LargePageHeader_t CurrentPageHeader;
 anim_FileHeader_t FileHeader;
@@ -72,6 +71,7 @@ void JE_closeAnim( void );
 int JE_loadAnim( const char * );
 int JE_renderFrame( unsigned int );
 int JE_findPage ( unsigned int );
+int JE_drawFrame( unsigned int );
 int JE_loadPage( unsigned int );
 
 /*** Implementation ***/
@@ -94,18 +94,21 @@ int JE_loadPage( unsigned int pagenumber )
 	 * unless it's the end of the file.
 	 *
 	 * Pages repeat their headers for some reason.  They then have two bytes of
-	 * padding followed by a word for every record.  THEN the data starts.
+	 * padding folowed by a word for every record.  THEN the data starts.
 	 */
 	fseek(InFile, ANIM_OFFSET + (pagenumber * ANI_PAGE_SIZE), SEEK_SET);
-	fread_u16_die(&CurrentPageHeader.baseRecord, 1, InFile);
-	fread_u16_die(&CurrentPageHeader.nRecords,   1, InFile);
-	fread_u16_die(&CurrentPageHeader.nBytes,     1, InFile);
+	efread(&CurrentPageHeader.baseRecord, 2, 1, InFile);
+	efread(&CurrentPageHeader.nRecords,   2, 1, InFile);
+	efread(&CurrentPageHeader.nBytes,     2, 1, InFile);
 
 	fseek(InFile, 2, SEEK_CUR);
-	fread_u16_die(CurrentPageRecordSizes, CurrentPageHeader.nRecords, InFile);
+	for (i = 0; i < CurrentPageHeader.nRecords; i++)
+	{
+		efread(&CurrentPageRecordSizes[i], 2, 1, InFile);
+	}
 
 	/* What remains is the 'compressed' data */
-	fread_die(CurrentPageBuffer, 1, CurrentPageHeader.nBytes, InFile);
+	efread(CurrentPageBuffer, 1, CurrentPageHeader.nBytes, InFile);
 
 	/* Okay, we've succeeded in all our IO checks.  Now, make sure the
 	 * headers aren't lying or damaged or something.
@@ -119,6 +122,20 @@ int JE_loadPage( unsigned int pagenumber )
 	if(pageSize != CurrentPageHeader.nBytes) { return(-1); }
 
 	/* So far, so good */
+	return(0);
+}
+
+int JE_drawFrame( unsigned int framenumber )
+{
+	int ret;
+
+
+	ret = JE_loadPage(framenumber);
+	if (ret) { return(ret); }
+
+	ret = JE_renderFrame (framenumber);
+	if (ret) { return(ret); }
+
 	return(0);
 }
 
@@ -174,7 +191,7 @@ void JE_playAnim( const char *animfile, JE_byte startingframe, JE_byte speed )
 	 * The final frame is a delta of the first, and we don't need that.
 	 * We could also, if we ever ended up needing to loop anis, check
 	 * the bools in the header to see if we should render the last
-	 * frame.  But that's never going to be necessary :)
+	 * frame.  But that's never going to be encessary :)
 	 */
     for (i = startingframe; i < FileHeader.nRecords-1; i++)
     {
@@ -211,8 +228,7 @@ void JE_playAnim( const char *animfile, JE_byte startingframe, JE_byte speed )
  */
 int JE_loadAnim( const char *filename )
 {
-	unsigned int i;
-	long fileSize;
+	unsigned int i, fileSize;
 	char temp[4];
 
 
@@ -239,10 +255,10 @@ int JE_loadAnim( const char *filename )
 	 * is constant will be ignored.
 	 */
 
-	fread_die(&temp, 1, 4, InFile); /* The ID, should equal "LPF " */
+	efread(&temp, 1, 4, InFile); /* The ID, should equal "LPF " */
 	fseek(InFile, 2, SEEK_CUR); /* skip over this word */
-	fread_u16_die(&FileHeader.nlps,     1, InFile); /* Number of pages */
-	fread_u32_die(&FileHeader.nRecords, 1, InFile); /* Number of records */
+	efread(&FileHeader.nlps, 2, 1, InFile); /* Number of pages */
+	efread(&FileHeader.nRecords, 4, 1, InFile); /* Number of records */
 
 	if (memcmp(temp, "LPF ", 4) != 0
 	 || FileHeader.nlps == 0  || FileHeader.nRecords == 0
@@ -256,9 +272,9 @@ int JE_loadAnim( const char *filename )
 	fseek(InFile, PAGEHEADER_OFFSET, SEEK_SET);
 	for (i = 0; i < FileHeader.nlps; i++)
 	{
-		fread_u16_die(&PageHeader[i].baseRecord, 1, InFile);
-		fread_u16_die(&PageHeader[i].nRecords,   1, InFile);
-		fread_u16_die(&PageHeader[i].nBytes,     1, InFile);
+		efread(&PageHeader[i].baseRecord, 2, 1, InFile);
+		efread(&PageHeader[i].nRecords,   2, 1, InFile);
+		efread(&PageHeader[i].nBytes,     2, 1, InFile);
 	}
 
 
@@ -278,11 +294,10 @@ int JE_loadAnim( const char *filename )
 	fseek(InFile, PALETTE_OFFSET, SEEK_SET);
 	for (i = 0; i < 256; i++)
 	{
-		Uint8 bgru[4];
-		fread_u8_die(bgru, 4, InFile);
-		colors[i].b = bgru[0];
-		colors[i].g = bgru[1];
-		colors[i].r = bgru[2];
+		efread(&colors[i].b,      1, 1, InFile);
+		efread(&colors[i].g,      1, 1, InFile);
+		efread(&colors[i].r,      1, 1, InFile);
+		getc(InFile);
 	}
 	set_palette(colors, 0, 255);
 

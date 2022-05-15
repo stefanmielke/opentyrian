@@ -55,11 +55,7 @@ void JE_starShowVGA( void );
 
 void JE_main( void );
 void JE_loadMap( void );
-void networkStartScreen( void );
-bool titleScreen( void );
-bool newGame( void );
-bool newSuperArcadeGame( unsigned int i );
-void newSuperTyrianGame( void );
+bool JE_titleScreen( JE_boolean animate );
 void JE_readTextSync( void );
 void JE_displayText( void );
 

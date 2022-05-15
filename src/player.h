@@ -36,24 +36,20 @@ enum
 
 typedef struct
 {
-	Uint8 ship;
-	Uint8 generator;
-	Uint8 shield;
-	struct
-	{
-		Uint8 id;
-		Uint8 power;
-	} weapon[2];
-	Uint8 sidekick[2];
-	Uint8 special;
+	uint ship;
+	uint generator;
+	uint shield;
+	struct { uint id; uint power; } weapon[2];
+	uint sidekick[2];
+	uint special;
 	
 	// Dragonwing only:
 	// repeatedly collecting the same powerup gives a series of sidekick upgrades
-	Uint8 sidekick_series;
-	Uint8 sidekick_level;
+	uint sidekick_series;
+	uint sidekick_level;
 	
 	// Single-player only
-	Uint8 super_arcade_mode;  // stored as an item for compatibility :(
+	uint super_arcade_mode;  // stored as an item for compatibility :(
 }
 PlayerItems;
 
@@ -64,7 +60,7 @@ typedef struct
 	PlayerItems items, last_items;
 	
 	bool is_dragonwing;  // i.e., is player 2
-	Uint8 *lives;
+	uint *lives;
 	
 	// calculatable
 	uint shield_max;
