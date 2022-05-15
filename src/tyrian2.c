@@ -53,6 +53,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <libdragon.h>
 
 inline static void blit_enemy( SDL_Surface *surface, unsigned int i, signed int x_offset, signed int y_offset, signed int sprite_offset );
 
@@ -1020,6 +1021,8 @@ start_level_first:
 
 level_loop:
 
+	int start = get_ticks_ms();
+
 	//tempScreenSeg = game_screen; /* side-effect of game_screen */
 
 	if (isNetworkGame)
@@ -1076,7 +1079,7 @@ level_loop:
 
 	if (!endLevel) // draw HUD
 	{
-		VGAScreen = VGAScreenSeg; /* side-effect of game_screen */
+		VGAScreen = VGAScreenSeg;
 
 		/*-----------------------Message Bar------------------------*/
 		if (textErase > 0 && --textErase == 0)
@@ -1202,12 +1205,6 @@ level_loop:
 
 	if (isNetworkGame && reallyEndLevel)
 		goto start_level;
-
-
-	/* SMOOTHIES! */
-	JE_checkSmoothies();
-	if (anySmoothies)
-		VGAScreen = VGAScreen2;  // this makes things complicated, but we do it anyway :(
 
 	/* --- BACKGROUNDS --- */
 	/* --- BACKGROUND 1 --- */
@@ -2318,6 +2315,8 @@ draw_player_shot_loop_end:
 			explodeMove = 2;
 		}
 	}
+
+	fprintf(stderr, "frame_time: %u\n", get_ticks_ms() - start);
 
 	if (reallyEndLevel)
 	{
