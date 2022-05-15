@@ -44,7 +44,6 @@
 #include "varz.h"
 #include "vga256d.h"
 #include "video.h"
-#include "video_scale.h"
 #include "xmas.h"
 
 #include <SDL.h>
@@ -73,7 +72,6 @@ void opentyrian_menu(void) {
   typedef enum {
     MENU_ABOUT = 0,
     MENU_FULLSCREEN,
-    MENU_SCALER,
     MENU_SCALING_MODE,
     // MENU_DESTRUCT,
     MENU_JUKEBOX,
@@ -119,7 +117,6 @@ void opentyrian_menu(void) {
   MenuOptions sel = 0;
 
   int temp_fullscreen_display = fullscreen_display;
-  uint temp_scaler = scaler;
   int temp_scaling_mode = scaling_mode;
 
   bool fade_in = true, quit = false;
@@ -139,10 +136,6 @@ void opentyrian_menu(void) {
                    temp_fullscreen_display + 1);
           text = buffer;
         }
-      } else if (i == MENU_SCALER) {
-        snprintf(buffer, sizeof(buffer), "Scaler: %s",
-                 scalers[temp_scaler].name);
-        text = buffer;
       } else if (i == MENU_SCALING_MODE) {
         snprintf(buffer, sizeof(buffer), menu_items[i],
                  scaling_mode_names[temp_scaling_mode]);
@@ -157,8 +150,7 @@ void opentyrian_menu(void) {
                                           : -2);
     }
 
-    if (sel == MENU_FULLSCREEN || sel == MENU_SCALER ||
-        sel == MENU_SCALING_MODE) {
+    if (sel == MENU_FULLSCREEN || sel == MENU_SCALING_MODE) {
       draw_font_hv_shadow(
           VGAScreen, VGAScreen->w / 2, 190,
           "Change option with Left/Right keys then press Enter.", small_font,
@@ -202,12 +194,6 @@ void opentyrian_menu(void) {
           temp_fullscreen_display--;
 
           JE_playSampleNum(S_CURSOR);
-        } else if (sel == MENU_SCALER) {
-          if (temp_scaler == 0)
-            temp_scaler = scalers_count;
-          temp_scaler--;
-
-          JE_playSampleNum(S_CURSOR);
         } else if (sel == MENU_SCALING_MODE) {
           if (temp_scaling_mode == 0)
             temp_scaling_mode = ScalingMode_MAX;
@@ -221,12 +207,6 @@ void opentyrian_menu(void) {
           temp_fullscreen_display++;
           if (temp_fullscreen_display == SDL_GetNumVideoDisplays())
             temp_fullscreen_display = -1;
-
-          JE_playSampleNum(S_CURSOR);
-        } else if (sel == MENU_SCALER) {
-          temp_scaler++;
-          if (temp_scaler == scalers_count)
-            temp_scaler = 0;
 
           JE_playSampleNum(S_CURSOR);
         } else if (sel == MENU_SCALING_MODE) {
@@ -255,18 +235,6 @@ void opentyrian_menu(void) {
           JE_playSampleNum(S_SELECT);
 
           reinit_fullscreen(temp_fullscreen_display);
-          break;
-
-        case MENU_SCALER:
-          JE_playSampleNum(S_SELECT);
-
-          if (scaler != temp_scaler) {
-            if (!init_scaler(temp_scaler) && // try new scaler
-                !init_scaler(scaler))        // revert on fail
-            {
-              exit(EXIT_FAILURE);
-            }
-          }
           break;
 
         case MENU_SCALING_MODE:

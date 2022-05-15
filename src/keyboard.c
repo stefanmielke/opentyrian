@@ -22,7 +22,6 @@
 #include "network.h"
 #include "opentyr.h"
 #include "video.h"
-#include "video_scale.h"
 
 #include <SDL.h>
 #include <stdio.h>
@@ -200,8 +199,8 @@ void service_SDL_events(JE_boolean clear_new) {
       if (ev.type == SDL_MOUSEBUTTONDOWN) {
         newmouse = true;
         lastmouse_but = ev.button.button;
-        lastmouse_x = ev.button.x * vga_width / scalers[scaler].width;
-        lastmouse_y = ev.button.y * vga_height / scalers[scaler].height;
+        lastmouse_x = ev.button.x;
+        lastmouse_y = ev.button.y;
         mousedown = true;
       } else {
         mousedown = false;

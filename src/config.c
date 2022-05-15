@@ -29,7 +29,6 @@
 #include "varz.h"
 #include "vga256d.h"
 #include "video.h"
-#include "video_scale.h"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -217,7 +216,6 @@ config_t opentyrian_config; // implicitly initialized
 bool load_opentyrian_config(void) {
   // defaults
   fullscreen_display = -1;
-  set_scaler_by_name("None");
 
   config_t *config = &opentyrian_config;
 
@@ -236,10 +234,6 @@ bool load_opentyrian_config(void) {
   section = config_find_section(config, "video", NULL);
   if (section != NULL) {
     config_get_int_option(section, "fullscreen", &fullscreen_display);
-
-    const char *scaler;
-    if (config_get_string_option(section, "scaler", &scaler))
-      set_scaler_by_name(scaler);
 
     const char *scaling_mode;
     if (config_get_string_option(section, "scaling_mode", &scaling_mode))
@@ -263,8 +257,6 @@ bool save_opentyrian_config(void) {
     exit(EXIT_FAILURE); // out of memory
 
   config_set_int_option(section, "fullscreen", fullscreen_display);
-
-  config_set_string_option(section, "scaler", scalers[scaler].name);
 
   config_set_string_option(section, "scaling_mode",
                            scaling_mode_names[scaling_mode]);

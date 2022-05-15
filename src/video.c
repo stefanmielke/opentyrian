@@ -21,7 +21,6 @@
 #include "keyboard.h"
 #include "opentyr.h"
 #include "palette.h"
-#include "video_scale.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -50,11 +49,8 @@ static SDL_Texture *main_window_texture;
 SDL_PixelFormat *main_window_tex_format;
 static bool renderer_needs_reinit;
 
-static ScalerFunction scaler_function;
-
 static void reinit_renderer();
 static void recenter_window_in_display();
-static void calc_dst_render_rect(SDL_Surface *src_surface, SDL_Rect *dst_rect);
 
 void init_video(void) {
   if (SDL_WasInit(SDL_INIT_VIDEO))
@@ -97,7 +93,6 @@ void init_video(void) {
 
   reinit_fullscreen(fullscreen_display);
   reinit_renderer();
-  init_scaler(scaler);
   SDL_ShowWindow(main_window);
 
   input_grab(input_grab_enabled);
@@ -106,8 +101,8 @@ void init_video(void) {
 static void reinit_renderer() {
   int bpp = 16; // TODOSDL2
   Uint32 format = bpp == 32 ? SDL_PIXELFORMAT_RGB888 : SDL_PIXELFORMAT_RGBA5551;
-  int scaler_w = scalers[scaler].width;
-  int scaler_h = scalers[scaler].height;
+  int scaler_w = vga_width;
+  int scaler_h = vga_height;
 
   // (re)-create the pixel format structure
   SDL_FreeFormat(main_window_tex_format);
@@ -158,8 +153,7 @@ void reinit_fullscreen(int new_display) {
 
   if (fullscreen_display == -1) {
     SDL_SetWindowFullscreen(main_window, SDL_FALSE);
-    SDL_SetWindowSize(main_window, scalers[scaler].width,
-                      scalers[scaler].height);
+    SDL_SetWindowSize(main_window, vga_width, vga_height);
     recenter_window_in_display();
   } else {
     SDL_SetWindowFullscreen(main_window, SDL_FALSE);
@@ -182,8 +176,8 @@ void video_on_win_resize() {
   // Also enforce a minimum size on the window.
 
   SDL_GetWindowSize(main_window, &w, &h);
-  scaler_w = scalers[scaler].width;
-  scaler_h = scalers[scaler].height;
+  scaler_w = vga_width;
+  scaler_h = vga_height;
 
   if (w < scaler_w || h < scaler_h) {
     w = w < scaler_w ? scaler_w : w;
@@ -201,41 +195,6 @@ void toggle_fullscreen(void) {
   } else {
     reinit_fullscreen(SDL_GetWindowDisplayIndex(main_window));
   }
-}
-
-bool init_scaler(unsigned int new_scaler) {
-  int w = scalers[new_scaler].width, h = scalers[new_scaler].height;
-  int bpp = main_window_tex_format->BitsPerPixel; // TODOSDL2
-
-  scaler = new_scaler;
-
-  if (fullscreen_display == -1) {
-    // Changing scalers, when not in fullscreen mode, forces the window
-    // to resize to exactly match the scaler's output dimensions.
-    SDL_SetWindowSize(main_window, w, h);
-    recenter_window_in_display();
-  }
-
-  renderer_needs_reinit = true;
-
-  switch (bpp) {
-  case 32:
-    scaler_function = scalers[scaler].scaler32;
-    break;
-  case 16:
-    scaler_function = scalers[scaler].scaler16;
-    break;
-  default:
-    scaler_function = NULL;
-    break;
-  }
-
-  if (scaler_function == NULL) {
-    assert(false);
-    return false;
-  }
-
-  return true;
 }
 
 bool set_scaling_mode_by_name(const char *name) {
@@ -266,65 +225,22 @@ void JE_clr256(SDL_Surface *screen) { SDL_FillRect(screen, NULL, 0); }
 
 void JE_showVGA(void) { scale_and_flip(VGAScreen); }
 
-static void calc_dst_render_rect(SDL_Surface *src_surface, SDL_Rect *dst_rect) {
-  // Decides how the logical output texture (after software scaling applied)
-  // will fit in the window.
+void nn_16(SDL_Surface *src_surface, SDL_Texture *dst_texture) {
+  const int dst_bpp = 2;
 
-  int win_w, win_h;
-  SDL_GetWindowSize(main_window, &win_w, &win_h);
+  int dst_pitch;
+  void *tmp_ptr;
+  SDL_LockTexture(dst_texture, NULL, &tmp_ptr, &dst_pitch);
 
-  int maxh_width, maxw_height;
-
-  switch (scaling_mode) {
-  case SCALE_CENTER:
-    SDL_QueryTexture(main_window_texture, NULL, NULL, &dst_rect->w,
-                     &dst_rect->h);
-    break;
-  case SCALE_INTEGER:
-    dst_rect->w = src_surface->w;
-    dst_rect->h = src_surface->h;
-    while (dst_rect->w + src_surface->w <= win_w &&
-           dst_rect->h + src_surface->h <= win_h) {
-      dst_rect->w += src_surface->w;
-      dst_rect->h += src_surface->h;
-    }
-    break;
-  case SCALE_ASPECT_8_5:
-    maxh_width = win_h * (8.f / 5.f);
-    maxw_height = win_w * (5.f / 8.f);
-
-    if (maxh_width > win_w) {
-      dst_rect->w = win_w;
-      dst_rect->h = maxw_height;
-    } else {
-      dst_rect->w = maxh_width;
-      dst_rect->h = win_h;
-    }
-    break;
-  case SCALE_ASPECT_4_3:
-    maxh_width = win_h * (4.f / 3.f);
-    maxw_height = win_w * (3.f / 4.f);
-
-    if (maxh_width > win_w) {
-      dst_rect->w = win_w;
-      dst_rect->h = maxw_height;
-    } else {
-      dst_rect->w = maxh_width;
-      dst_rect->h = win_h;
-    }
-    break;
-  case ScalingMode_MAX:
-    assert(false);
-    break;
+  Uint8 *src = src_surface->pixels;
+  for (int y = 0; y < vga_height * vga_width; ++y) {
+      *(Uint16 *)tmp_ptr = rgb_palette[*src];
+      tmp_ptr += dst_bpp;
+      ++src;
   }
-
-  dst_rect->x = (win_w - dst_rect->w) / 2;
-  dst_rect->y = (win_h - dst_rect->h) / 2;
 }
 
 void scale_and_flip(SDL_Surface *src_surface) {
-  assert(src_surface->format->BitsPerPixel == 8);
-
   // Apply all changes to video settings accumulated throughout the frame, here.
   if (renderer_needs_reinit) {
     reinit_renderer();
@@ -332,15 +248,13 @@ void scale_and_flip(SDL_Surface *src_surface) {
   }
 
   // Do software scaling
-  assert(scaler_function != NULL);
-  scaler_function(src_surface, main_window_texture);
+  nn_16(src_surface, main_window_texture);
 
   // Clear the window and blit the output texture to it
   SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
   SDL_RenderClear(main_window_renderer);
 
-  SDL_Rect dst_rect;
-  calc_dst_render_rect(src_surface, &dst_rect);
+  const SDL_Rect dst_rect = { 0, 0, 320, 240 };
 
   SDL_RenderSetViewport(main_window_renderer, NULL);
   SDL_RenderCopy(main_window_renderer, main_window_texture, NULL, &dst_rect);

@@ -74,79 +74,27 @@ JE_byte itemAvailMax[9]; /* [1..9] */
 
 void JE_starShowVGA( void )
 {
-	JE_byte *src;
-	Uint8 *s = NULL; /* screen pointer, 8-bit specific */
-
-	int x, y, lightx, lighty, lightdist;
-
 	if (!playerEndLevel && !skipStarShowVGA)
 	{
-
-		s = VGAScreenSeg->pixels;
-
-		src = game_screen->pixels;
-		src += 24;
-
 		if (smoothScroll != 0 /*&& thisPlayerNum != 2*/)
 		{
 			wait_delay();
 			setjasondelay(frameCountMax);
 		}
 
-		if (starShowVGASpecialCode == 1)
-		{
-			src += game_screen->pitch * 183;
-			for (y = 0; y < 184; y++)
-			{
-				memmove(s, src, 264);
-				s += VGAScreenSeg->pitch;
-				src -= game_screen->pitch;
-			}
-		}
-		else if (starShowVGASpecialCode == 2 && processorType >= 2)
-		{
-			lighty = 172 - player[0].y;
-			lightx = 281 - player[0].x;
+		Uint8 *s = VGAScreenSeg->pixels;
 
-			for (y = 184; y; y--)
-			{
-				if (lighty > y)
-				{
-					for (x = 320 - 56; x; x--)
-					{
-						*s = (*src & 0xf0) | ((*src >> 2) & 0x03);
-						s++;
-						src++;
-					}
-				}
-				else
-				{
-					for (x = 320 - 56; x; x--)
-					{
-						lightdist = abs(lightx - x) + lighty;
-						if (lightdist < y)
-							*s = *src;
-						else if (lightdist - y <= 5)
-							*s = (*src & 0xf0) | (((*src & 0x0f) + (3 * (5 - (lightdist - y)))) / 4);
-						else
-							*s = (*src & 0xf0) | ((*src & 0x0f) >> 2);
-						s++;
-						src++;
-					}
-				}
-				s += 56 + VGAScreenSeg->pitch - 320;
-				src += 56 + VGAScreenSeg->pitch - 320;
-			}
-		}
-		else
+		JE_byte *src = game_screen->pixels;
+		src += 24;
+
+		int y;
+		for (y = 0; y < 184; y++)
 		{
-			for (y = 0; y < 184; y++)
-			{
-				memmove(s, src, 264);
-				s += VGAScreenSeg->pitch;
-				src += game_screen->pitch;
-			}
+			memcpy(s, src, 264);
+			s += VGAScreenSeg->pitch;
+			src += game_screen->pitch;
 		}
+		
 		JE_showVGA();
 	}
 
@@ -654,7 +602,7 @@ start_level:
 	/* Normal speed */
 	if (fastPlay != 0)
 	{
-		smoothScroll = true;
+		smoothScroll = false;
 		speed = 0x4300;
 		JE_resetTimerInt();
 		JE_setTimerInt();
@@ -1125,7 +1073,6 @@ level_loop:
 	{
 		play_song(levelSong - 1);
 	}
-
 
 	if (!endLevel) // draw HUD
 	{
@@ -2317,15 +2264,6 @@ draw_player_shot_loop_end:
 	}
 #endif
 
-	/** Test **/
-	JE_drawSP();
-
-	/*Filtration*/
-	if (filterActive)
-	{
-		JE_filterScreen(levelFilter, levelBrightness);
-	}
-
 	draw_boss_bar();
 
 	JE_inGameDisplays();
@@ -2380,10 +2318,6 @@ draw_player_shot_loop_end:
 			explodeMove = 2;
 		}
 	}
-
-
-	/*Other Network Functions*/
-	JE_handleChat();
 
 	if (reallyEndLevel)
 	{
