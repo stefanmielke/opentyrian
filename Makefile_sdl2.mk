@@ -4,7 +4,7 @@ N64_CFLAGS += -D_POSIX_C_SOURCE=0 -D__MIPS__
 
 # warnings from original code
 N64_CFLAGS += -Wno-error=format-truncation -Wno-format-truncation -Wno-error=format -Wno-error=array-bounds
-N64_CFLAGS += -Wno-error=format-overflow= -Wno-error=restrict -Wno-error=maybe-uninitialized -Wno-error=use-after-free
+N64_CFLAGS += -Wno-error=format-overflow= -Wno-error=restrict -Wno-error=maybe-uninitialized -Wno-error=use-after-free -Wno-error=pointer-to-int-cast
 
 C_SDL_FILES  := $(wildcard ${SDL2_SOURCE_DIR}/*.c) \
 				$(wildcard ${SDL2_SOURCE_DIR}/atomic/*.c) \
