@@ -16,11 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "opentyr.h"
 #include "backgrnd.h"
 
 #include "config.h"
 #include "mtrand.h"
+#include "opentyr.h"
 #include "varz.h"
 #include "video.h"
 
@@ -63,6 +63,8 @@ void JE_darkenBackground( JE_word neat )  /* wild detail level */
 
 void blit_background_row( SDL_Surface *surface, int x, int y, Uint8 **map )
 {
+	assert(surface->format->BitsPerPixel == 8);
+	
 	Uint8 *pixels = (Uint8 *)surface->pixels + (y * surface->pitch) + x,
 	      *pixels_ll = (Uint8 *)surface->pixels,  // lower limit
 	      *pixels_ul = (Uint8 *)surface->pixels + (surface->h * surface->pitch);  // upper limit
@@ -153,6 +155,8 @@ void blit_background_row_blend( SDL_Surface *surface, int x, int y, Uint8 **map 
 
 void draw_background_1( SDL_Surface *surface )
 {
+	SDL_FillRect(surface, NULL, 0);
+	
 	Uint8 **map = (Uint8 **)mapYPos + mapXbpPos - 12;
 	
 	for (int i = -1; i < 7; i++)
@@ -170,7 +174,7 @@ void draw_background_2( SDL_Surface *surface )
 	
 	if (background2 != 0)
 	{
-		// water effect combines background 1 and 2 by syncronizing the x coordinate
+		// water effect combines background 1 and 2 by synchronizing the x coordinate
 		int x = smoothies[1] ? mapXPos : mapX2Pos;
 		
 		Uint8 **map = (Uint8 **)mapY2Pos + (smoothies[1] ? mapXbpPos : mapX2bpPos) - 12;

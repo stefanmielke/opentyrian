@@ -24,6 +24,7 @@
 #include "opentyr.h"
 
 #include <SDL.h>
+
 #include <stdio.h>
 
 #define SAVE_FILES_NUM (11 * 2)
@@ -38,8 +39,38 @@
 /*#define SAVE_FILES_SIZE (2502 - 4)
 #define SAVE_FILE_SIZE (SAVE_FILES_SIZE)*/
 
-typedef SDL_Scancode JE_KeySettingType[8]; /* [1..8] */
-typedef JE_byte JE_PItemsType[12];         /* [1..12] */
+enum {
+  DIFFICULTY_WIMP = 0,
+  DIFFICULTY_EASY,
+  DIFFICULTY_NORMAL,
+  DIFFICULTY_HARD,
+  DIFFICULTY_IMPOSSIBLE,
+  DIFFICULTY_INSANITY,
+  DIFFICULTY_SUICIDE,
+  DIFFICULTY_MANIACAL,
+  DIFFICULTY_ZINGLON, // aka Lord of the Game
+  DIFFICULTY_NORTANEOUS,
+  DIFFICULTY_10,
+};
+
+// NOTE: Do not reorder.  This ordering corresponds to the keyboard
+//       configuration menu and to the bits stored in demo files.
+enum {
+  KEY_SETTING_UP,
+  KEY_SETTING_DOWN,
+  KEY_SETTING_LEFT,
+  KEY_SETTING_RIGHT,
+  KEY_SETTING_FIRE,
+  KEY_SETTING_CHANGE_FIRE,
+  KEY_SETTING_LEFT_SIDEKICK,
+  KEY_SETTING_RIGHT_SIDEKICK,
+};
+
+typedef JE_byte DosKeySettings[8]; // fka KeySettingType
+
+typedef SDL_Scancode KeySettings[8];
+
+typedef JE_byte JE_PItemsType[12]; /* [1..12] */
 
 typedef JE_byte JE_EditorItemAvailType[100]; /* [1..100] */
 
@@ -65,7 +96,8 @@ typedef struct {
 
   /* High Scores - Each episode has both sets of 1&2 player selections - with 3
    * in each */
-  JE_longint highScore1, highScore2;
+  JE_longint highScore1;
+  JE_longint highScore2;  // unused
   char highScoreName[30]; /* string [29] */
   JE_byte highScoreDiff;
 } JE_SaveFileType;
@@ -76,7 +108,8 @@ typedef JE_byte JE_SaveGameTemp[SAVE_FILES_SIZE + 4 +
                                 100]; /* [1..sizeof(savefilestype) + 4 + 100] */
 
 extern const JE_byte cryptKey[10];
-extern const JE_KeySettingType defaultKeySettings;
+extern const DosKeySettings defaultDosKeySettings; // fka defaultKeySettings
+extern const KeySettings defaultKeySettings;
 extern const char defaultHighScoreNames[34][23];
 extern const char defaultTeamNames[22][25];
 extern const JE_EditorItemAvailType initialItemAvail;
@@ -107,7 +140,8 @@ extern JE_byte shotRepeat[11], shotMultiPos[11];
 extern JE_boolean portConfigChange, portConfigDone;
 extern char lastLevelName[11], levelName[11];
 extern JE_byte mainLevel, nextLevel, saveLevel;
-extern JE_KeySettingType keySettings;
+extern DosKeySettings dosKeySettings; // fka keySettings
+extern KeySettings keySettings;
 extern JE_shortint levelFilter, levelFilterNew, levelBrightness,
     levelBrightnessChg;
 extern JE_boolean filtrationAvail, filterActive, filterFade, filterFadeStart;
@@ -136,7 +170,7 @@ extern JE_SaveFilesType saveFiles;
 extern JE_SaveGameTemp saveTemp;
 extern JE_word editorLevel;
 
-extern config_t opentyrian_config;
+extern Config opentyrian_config;
 
 void JE_initProcessorType(void);
 void JE_setNewGameSpeed(void);

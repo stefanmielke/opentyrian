@@ -18,26 +18,27 @@
  * USA.
  */
 #include "file.h"
+
 #include "opentyr.h"
+#include "varz.h"
 
 #include <SDL.h>
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-const char *custom_data_dir = ".";
+const char *custom_data_dir = NULL;
 
 // finds the Tyrian data directory
 const char *data_dir(void) {
-#ifdef N64
-  return "rom://tyrian21/";
-#else
-  const char *dirs[] = {custom_data_dir, "data",
-#ifdef TARGET_MACOSX
-                        tyrian_game_folder(),
-#endif
-                        "/usr/share/opentyrian/data"};
+  const char *const dirs[] = {
+      custom_data_dir,
+      TYRIAN_DIR,
+      "data",
+      ".",
+  };
 
   static const char *dir = NULL;
 
@@ -45,6 +46,9 @@ const char *data_dir(void) {
     return dir;
 
   for (uint i = 0; i < COUNTOF(dirs); ++i) {
+    if (dirs[i] == NULL)
+      continue;
+
     FILE *f = dir_fopen(dirs[i], "tyrian1.lvl", "rb");
     if (f) {
       fclose(f);
@@ -58,7 +62,6 @@ const char *data_dir(void) {
     dir = "";
 
   return dir;
-#endif
 }
 
 // prepend directory and fopen
@@ -78,7 +81,7 @@ FILE *dir_fopen_warn(const char *dir, const char *file, const char *mode) {
   FILE *f = dir_fopen(dir, file, mode);
 
   if (f == NULL)
-    fprintf(stderr, "warning: failed to open '%s': %s\n", file,
+    fprintf(stderr, "warning: failed to open '%s/%s': %s\n", dir, file,
             strerror(errno));
 
   return f;
@@ -89,11 +92,12 @@ FILE *dir_fopen_die(const char *dir, const char *file, const char *mode) {
   FILE *f = dir_fopen(dir, file, mode);
 
   if (f == NULL) {
-    fprintf(stderr, "error: failed to open '%s': %s\n", file, strerror(errno));
+    fprintf(stderr, "error: failed to open '%s/%s': %s\n", dir, file,
+            strerror(errno));
     fprintf(stderr, "error: One or more of the required Tyrian " TYRIAN_VERSION
                     " data files could not be found.\n"
                     "       Please read the README file.\n");
-    exit(1);
+    JE_tyrianHalt(1);
   }
 
   return f;
@@ -119,59 +123,23 @@ long ftell_eof(FILE *f) {
   return size;
 }
 
-// endian-swapping fread
-size_t efread(void *buffer, size_t size, size_t num, FILE *stream) {
-  size_t f = fread(buffer, size, num, stream);
-
-  switch (size) {
-  case 2:
-    for (size_t i = 0; i < num; i++)
-      ((Uint16 *)buffer)[i] = SDL_Swap16(((Uint16 *)buffer)[i]);
-    break;
-  case 4:
-    for (size_t i = 0; i < num; i++)
-      ((Uint32 *)buffer)[i] = SDL_Swap32(((Uint32 *)buffer)[i]);
-    break;
-  case 8:
-    for (size_t i = 0; i < num; i++)
-      ((Uint64 *)buffer)[i] = SDL_Swap64(((Uint64 *)buffer)[i]);
-    break;
-  default:
-    break;
+void fread_die(void *buffer, size_t size, size_t count, FILE *stream) {
+  size_t result = fread(buffer, size, count, stream);
+  if (result != count) {
+    fprintf(
+        stderr,
+        "error: An unexpected problem occurred while reading from a file.\n");
+    SDL_Quit();
+    exit(EXIT_FAILURE);
   }
-
-  return f;
 }
 
-// endian-swapping fwrite
-size_t efwrite(void *buffer, size_t size, size_t num, FILE *stream) {
-  void *swap_buffer;
-
-  switch (size) {
-  case 2:
-    swap_buffer = malloc(size * num);
-    for (size_t i = 0; i < num; i++)
-      ((Uint16 *)swap_buffer)[i] = SDL_SwapLE16(((Uint16 *)buffer)[i]);
-    break;
-  case 4:
-    swap_buffer = malloc(size * num);
-    for (size_t i = 0; i < num; i++)
-      ((Uint32 *)swap_buffer)[i] = SDL_SwapLE32(((Uint32 *)buffer)[i]);
-    break;
-  case 8:
-    swap_buffer = malloc(size * num);
-    for (size_t i = 0; i < num; i++)
-      ((Uint64 *)swap_buffer)[i] = SDL_SwapLE64(((Uint64 *)buffer)[i]);
-    break;
-  default:
-    swap_buffer = buffer;
-    break;
+void fwrite_die(const void *buffer, size_t size, size_t count, FILE *stream) {
+  size_t result = fwrite(buffer, size, count, stream);
+  if (result != count) {
+    fprintf(stderr,
+            "error: An unexpected problem occurred while writing to a file.\n");
+    SDL_Quit();
+    exit(EXIT_FAILURE);
   }
-
-  size_t f = fwrite(swap_buffer, size, num, stream);
-
-  if (swap_buffer != buffer)
-    free(swap_buffer);
-
-  return f;
 }

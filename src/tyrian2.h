@@ -55,7 +55,11 @@ void JE_starShowVGA( void );
 
 void JE_main( void );
 void JE_loadMap( void );
-bool JE_titleScreen( JE_boolean animate );
+void networkStartScreen( void );
+bool titleScreen( void );
+bool newGame( void );
+bool newSuperArcadeGame( unsigned int i );
+void newSuperTyrianGame( void );
 void JE_readTextSync( void );
 void JE_displayText( void );
 
@@ -63,6 +67,8 @@ bool JE_searchFor( JE_byte PLType, JE_byte* out_index );
 void JE_eventSystem( void );
 
 void draw_boss_bar( void );
+
+void printf_memory( void );
 
 #endif /* TYRIAN2_H */
 

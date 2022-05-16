@@ -16,8 +16,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include "config.h"
 #include "editship.h"
+
+#include "config.h"
 #include "file.h"
 #include "opentyr.h"
 
@@ -82,8 +83,8 @@ void JE_loadExtraShapes( void )
 		extraAvail = true;
 		extraShapeSize = ftell_eof(f) - sizeof(extraShips);
 		extraShapes = malloc(extraShapeSize);
-		efread(extraShapes, extraShapeSize, 1, f);
-		efread(extraShips, sizeof(extraShips), 1, f);
+		fread_die(extraShapes, extraShapeSize, 1, f);
+		fread_die(extraShips, sizeof(extraShips), 1, f);
 		JE_decryptShips();
 		fclose(f);
 	}

@@ -18,6 +18,7 @@
  * USA.
  */
 #include "vga256d.h"
+
 #include "config.h" // For fullscreen stuff
 #include "keyboard.h"
 #include "opentyr.h"
@@ -25,6 +26,7 @@
 #include "video.h"
 
 #include <SDL.h>
+
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
@@ -40,7 +42,7 @@ void JE_pix(SDL_Surface *surface, int x, int y, JE_byte c) {
 }
 
 void JE_pix3(SDL_Surface *surface, int x, int y, JE_byte c) {
-  /* Originally impemented as several direct accesses */
+  /* Originally implemented as several direct accesses */
   JE_pix(surface, x, y, c);
   JE_pix(surface, x - 1, y, c);
   JE_pix(surface, x + 1, y, c);
@@ -146,10 +148,10 @@ void draw_segmented_gauge(SDL_Surface *surface, int x, int y, Uint8 color,
              partial_segment = value % segment_value;
 
   for (uint i = 0; i < segments; ++i) {
-    fill_rectangle_hw(surface, x, y, segment_width, segment_height, color + 12);
+    fill_rectangle_wh(surface, x, y, segment_width, segment_height, color + 12);
     x += segment_width + 1;
   }
   if (partial_segment > 0)
-    fill_rectangle_hw(surface, x, y, segment_width, segment_height,
+    fill_rectangle_wh(surface, x, y, segment_width, segment_height,
                       color + (12 * partial_segment / segment_value));
 }

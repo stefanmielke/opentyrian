@@ -32,7 +32,7 @@
  * to not have available.  Destruct has no configuration options in game, but
  * that doesn't stop us from changing various limiting vars and letting
  * people remap the keyboard.  AIs may also be introduced here; fighting a
- * stateless AI isn't really challenging afterall.
+ * stateless AI isn't really challenging after all.
  *
  * This hidden config also allows for a hidden game mode!  Though as a custom
  * game mode wouldn't show up in the data files it forces us to distinguish
@@ -40,12 +40,11 @@
  * is only used with loaded data.
  *
  * Things I wanted to do but can't: Remove references to VGAScreen.  For
- * a multitude of reasons this just isn't feasable.  It would have been nice
+ * a multitude of reasons this just isn't feasible.  It would have been nice
  * to increase the playing field though...
  */
 
 /*** Headers ***/
-#include "opentyr.h"
 #include "destruct.h"
 
 #include "config.h"
@@ -56,6 +55,7 @@
 #include "loudness.h"
 #include "mtrand.h"
 #include "nortsong.h"
+#include "opentyr.h"
 #include "palette.h"
 #include "picload.h"
 #include "sprite.h"
@@ -324,7 +324,7 @@ static JE_byte basetypes[10][11] /*[1..8, 1..11]*/ = /* [0] is amount of units*/
 	{8, UNIT_HELI, UNIT_HELI, UNIT_HELI, UNIT_HELI,      UNIT_HELI,   UNIT_HELI,      UNIT_HELI,   UNIT_HELI,   UNIT_HELI,   UNIT_HELI},   /*Strong Heli attack fleet*/
 	{4, UNIT_TANK, UNIT_TANK, UNIT_TANK, UNIT_TANK,      UNIT_NUKE,   UNIT_NUKE,      UNIT_DIRT,   UNIT_MAGNET, UNIT_JUMPER, UNIT_JUMPER}, /*Weak   Heli defense fleet*/
 	{8, UNIT_TANK, UNIT_NUKE, UNIT_DIRT, UNIT_SATELLITE, UNIT_MAGNET, UNIT_LASER,     UNIT_JUMPER, UNIT_HELI,   UNIT_TANK,   UNIT_NUKE},   /*Overpowering fleet*/
-	{4, UNIT_TANK, UNIT_TANK, UNIT_NUKE, UNIT_DIRT,      UNIT_TANK,   UNIT_LASER,     UNIT_JUMPER, UNIT_HELI,   UNIT_NUKE,   UNIT_JUMPER},  /*Weak fleet*/
+	{4, UNIT_TANK, UNIT_TANK, UNIT_NUKE, UNIT_DIRT,      UNIT_TANK,   UNIT_LASER,     UNIT_JUMPER, UNIT_HELI,   UNIT_NUKE,   UNIT_JUMPER}, /*Weak fleet*/
 	{5, UNIT_TANK, UNIT_TANK, UNIT_NUKE, UNIT_DIRT,      UNIT_DIRT,   UNIT_SATELLITE, UNIT_MAGNET, UNIT_LASER,  UNIT_JUMPER, UNIT_HELI},   /*Left custom*/
 	{5, UNIT_TANK, UNIT_TANK, UNIT_NUKE, UNIT_DIRT,      UNIT_DIRT,   UNIT_SATELLITE, UNIT_MAGNET, UNIT_LASER,  UNIT_JUMPER, UNIT_HELI},   /*Right custom*/
 };
@@ -381,18 +381,18 @@ static struct destruct_shot_s   * shotRec;
 static struct destruct_explo_s  * exploRec;
 
 
-static const char *player_names[] =
+static const char *const player_names[] =
 {
 	"left", "right",
 };
 
-static const char *key_names[] =
+static const char *const key_names[] =
 {
 	"left", "right", "up", "down",
 	"change", "fire", "previous weapon", "next weapon",
 };
 
-static const char *unit_names[] =
+static const char *const unit_names[] =
 {
 	"tank", "nuke", "dirt", "satellite",
 	"magnet", "laser", "jumper", "heli",
@@ -407,9 +407,9 @@ static enum de_unit_t get_unit_by_name( const char *unit_name )
 	return UNIT_NONE;
 }
 
-static void load_destruct_config( config_t *config_ )
+static void load_destruct_config( Config *config_ )
 {
-	config_section_t *section;
+	ConfigSection *section;
 	
 	section = config_find_or_add_section(config_, "destruct", NULL);
 	if (section == NULL)
@@ -438,7 +438,7 @@ static void load_destruct_config( config_t *config_ )
 			if ((section = config_add_section(config_, "destruct keyboard", player_names[p])) == NULL)
 				exit(-1);
 		
-		config_option_t *option;
+		ConfigOption *option;
 		
 		for (int k = 0; k < MAX_KEY; ++k)
 		{
@@ -470,7 +470,7 @@ static void load_destruct_config( config_t *config_ )
 				// set defaults
 				for (unsigned int i = 0; i < COUNTOF(defaultKeyConfig[p][k]); ++i)
 					if (defaultKeyConfig[p][k][i] != SDL_SCANCODE_UNKNOWN)
-						config_add_value(option, SDL_GetKeyName(defaultKeyConfig[p][k][i]));
+						config_add_value(option, SDL_GetScancodeName(defaultKeyConfig[p][k][i]));
 			}
 		}
 	}
@@ -491,7 +491,7 @@ static void load_destruct_config( config_t *config_ )
 		snprintf(buffer, sizeof(buffer), "%s num units", player_names[p]);
 		basetypes[8 + p][0] = config_get_or_set_int_option(section, buffer, basetypes[8 + p][0]);
 		
-		config_option_t *option;
+		ConfigOption *option;
 		
 		snprintf(buffer, sizeof(buffer), "%s unit", player_names[p]);
 		if ((option = config_get_or_set_option(section, buffer, NULL)) == NULL)
@@ -557,10 +557,13 @@ void JE_destructGame( void )
 	destructTempScreen = game_screen;
 	world.VGAScreen = VGAScreen;
 
-	JE_loadCompShapes(&eShapes[0], '~');
+	JE_loadCompShapes(&destructSpriteSheet, '~');
+
 	fade_black(1);
 
 	JE_destructMain();
+
+	free_sprite2s(&destructSpriteSheet);
 
 	//and of course exit actions go here.
 	free(shotRec);
@@ -1324,7 +1327,7 @@ static void JE_pauseScreen( void )
 
 /* DE_ResetX
  *
- * The reset functions clear the state of whatefer they are assigned to.
+ * The reset functions clear the state of whatever they are assigned to.
  */
 static void DE_ResetUnits( void )
 {
@@ -1511,7 +1514,7 @@ static enum de_state_t DE_RunTick( void )
 /* DE_RunTickX
  *
  * Handles something that we do once per tick, such as
- * track ammo and move asplosions.
+ * track ammo and move explosions.
  */
 static void DE_RunTickCycleDeadUnits( void )
 {
@@ -1566,8 +1569,8 @@ static void DE_RunTickGravity( void )
 					DE_GravityFlyUnit(unit);
 					break;
 				}
-				/* else fall through and treat as a normal unit */
-
+				/* else treat as a normal unit */
+				/* fall through */
 			default:
 				DE_GravityLowerUnit(unit);
 			}
@@ -1585,7 +1588,7 @@ static void DE_GravityDrawUnit( enum de_player_t team, struct destruct_unit_s * 
 	anim_index = GraphicBase[team][unit->unitType] + unit->ani_frame;
 	if (unit->unitType == UNIT_HELI)
 	{
-		/* Adjust animation index if we are travelling right or left. */
+		/* Adjust animation index if we are traveling right or left. */
 		if (unit->lastMove < -2)
 			anim_index += 5;
 		else if (unit->lastMove > 2)
@@ -1596,7 +1599,7 @@ static void DE_GravityDrawUnit( enum de_player_t team, struct destruct_unit_s * 
 		anim_index += floorf(unit->angle * 9.99f / M_PI);
 	}
 
-	blit_sprite2(VGAScreen, unit->unitX, roundf(unit->unitY) - 13, eShapes[0], anim_index);
+	blit_sprite2(VGAScreen, unit->unitX, roundf(unit->unitY) - 13, destructSpriteSheet, anim_index);
 }
 static void DE_GravityLowerUnit( struct destruct_unit_s * unit )
 {
@@ -1688,7 +1691,7 @@ static void DE_RunTickDrawWalls( void )
 	{
 		if (world.mapWalls[i].wallExist)
 		{
-			blit_sprite2(VGAScreen, world.mapWalls[i].wallX, world.mapWalls[i].wallY, eShapes[0], 42);
+			blit_sprite2(VGAScreen, world.mapWalls[i].wallX, world.mapWalls[i].wallY, destructSpriteSheet, 42);
 		}
 	}
 }
@@ -2090,9 +2093,9 @@ static void DE_RunTickAI( void )
 			ptrUnit = ptrTarget->unit;
 			for (j = 0; j < config.max_installations; j++, ptrUnit++)
 			{
-				if (abs(ptrUnit->unitX - ptrCurUnit->unitX) < 8)
+				if (abs((int)ptrUnit->unitX - (int)ptrCurUnit->unitX) < 8)
 				{
-					/* I get it.  This makes helicoptors hover over
+					/* I get it.  This makes helicopters hover over
 					 * their enemies. */
 					if (ptrUnit->unitType == UNIT_SATELLITE)
 					{
@@ -2227,7 +2230,7 @@ static void DE_RunTickDrawHUD( void )
 		JE_rectangle(VGAScreen, startX + 17, 2, startX + 143, 9, 242);
 		JE_rectangle(VGAScreen, startX + 16, 1, startX + 144, 10, 240);
 
-		blit_sprite2(VGAScreen, startX +  4, 0, eShapes[0], 191 + curUnit->shotType);
+		blit_sprite2(VGAScreen, startX +  4, 0, destructSpriteSheet, 191 + curUnit->shotType);
 
 		JE_outText   (VGAScreen, startX + 20, 3, weaponNames[curUnit->shotType], 15, 2);
 		sprintf      (tempstr, "dmg~%d~", curUnit->health);

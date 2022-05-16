@@ -18,6 +18,7 @@
  * USA.
  */
 #include "nortsong.h"
+
 #include "file.h"
 #include "joystick.h"
 #include "keyboard.h"
@@ -94,7 +95,6 @@ void wait_delayorinput(JE_boolean keyboard, JE_boolean mouse,
 
 void JE_loadSndFile(const char *effects_sndfile, const char *voices_sndfile) {
   JE_byte y, z;
-  JE_word x;
   JE_longint templ;
   JE_longint sndPos[2][SAMPLE_COUNT + 1];
   JE_word sndNum;
@@ -103,11 +103,11 @@ void JE_loadSndFile(const char *effects_sndfile, const char *voices_sndfile) {
 
   /* SYN: Loading offsets into TYRIAN.SND */
   fi = dir_fopen_die(data_dir(), effects_sndfile, "rb");
-  efread(&sndNum, sizeof(sndNum), 1, fi);
 
-  for (x = 0; x < sndNum; x++) {
-    efread(&sndPos[0][x], sizeof(sndPos[0][x]), 1, fi);
-  }
+  fread_u16_die(&sndNum, 1, fi);
+
+  assert(sndNum < COUNTOF(sndPos[0]) - 1);
+  fread_s32_die(sndPos[0], sndNum, fi);
   fseek(fi, 0, SEEK_END);
   sndPos[0][sndNum] = ftell(fi); /* Store file size */
 
@@ -116,7 +116,7 @@ void JE_loadSndFile(const char *effects_sndfile, const char *voices_sndfile) {
     fxSize[z] = (sndPos[0][z + 1] - sndPos[0][z]); /* Store sample sizes */
     free(digiFx[z]);
     digiFx[z] = malloc(fxSize[z]);
-    efread(digiFx[z], 1, fxSize[z], fi); /* JE: Load sample to buffer */
+    fread_u8_die(digiFx[z], fxSize[z], fi); /* JE: Load sample to buffer */
   }
 
   fclose(fi);
@@ -124,11 +124,10 @@ void JE_loadSndFile(const char *effects_sndfile, const char *voices_sndfile) {
   /* SYN: Loading offsets into VOICES.SND */
   fi = dir_fopen_die(data_dir(), voices_sndfile, "rb");
 
-  efread(&sndNum, sizeof(sndNum), 1, fi);
+  fread_u16_die(&sndNum, 1, fi);
 
-  for (x = 0; x < sndNum; x++) {
-    efread(&sndPos[1][x], sizeof(sndPos[1][x]), 1, fi);
-  }
+  assert(sndNum < COUNTOF(sndPos[1]) - 1);
+  fread_s32_die(sndPos[1], sndNum, fi);
   fseek(fi, 0, SEEK_END);
   sndPos[1][sndNum] = ftell(fi); /* Store file size */
 
@@ -142,8 +141,10 @@ void JE_loadSndFile(const char *effects_sndfile, const char *voices_sndfile) {
     if (templ < 1)
       templ = 1;
     fxSize[z + y] = templ; /* Store sample sizes */
+    free(digiFx[z + y]);
     digiFx[z + y] = malloc(fxSize[z + y]);
-    efread(digiFx[z + y], 1, fxSize[z + y], fi); /* JE: Load sample to buffer */
+    fread_u8_die(digiFx[z + y], fxSize[z + y],
+                 fi); /* JE: Load sample to buffer */
   }
 
   fclose(fi);

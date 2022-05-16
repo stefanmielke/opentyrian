@@ -16,11 +16,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+#include "mainint.h"
+
 #include "backgrnd.h"
 #include "config.h"
 #include "editship.h"
 #include "episodes.h"
 #include "file.h"
+#include "font.h"
 #include "fonthand.h"
 #include "helptext.h"
 #include "helptext.h"
@@ -28,7 +31,6 @@
 #include "keyboard.h"
 #include "lds_play.h"
 #include "loudness.h"
-#include "mainint.h"
 #include "menus.h"
 #include "mouse.h"
 #include "mtrand.h"
@@ -41,7 +43,6 @@
 #include "pcxmast.h"
 #include "picload.h"
 #include "player.h"
-#include "setup.h"
 #include "shots.h"
 #include "sndmast.h"
 #include "sprite.h"
@@ -52,10 +53,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
-
-#ifdef VITA
-#include "keyboard_vita.h"
-#endif
 
 bool button[4];
 
@@ -189,249 +186,395 @@ void JE_drawPortConfigButtons( void ) // rear weapon pattern indicator
 	}
 }
 
+static bool helpSystemPage( Uint8 *topic, bool *restart );
+
 void JE_helpSystem( JE_byte startTopic )
 {
-	JE_integer page, lastPage = 0;
-	JE_byte menu;
+	if (shopSpriteSheet.data == NULL)
+		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprites
 
-	page = topicStart[startTopic-1];
+	Uint8 topic = startTopic;
 
-	fade_black(10);
-	JE_loadPic(VGAScreen, 2, false);
+	bool restart = true;
 
-	play_song(SONG_MAPVIEW);
+	const size_t menuItemsCount = COUNTOF(topicName) - 1;
+	size_t selectedIndex = 0;
 
-	JE_showVGA();
-	fade_palette(colors, 10, 0, 255);
+	const int xCenter = 320 / 2;
+	const int yMenuHeader = 30;
+	const int yMenuItems = 60;
+	const int dyMenuItems = 20;
+	const int hMenuItem = 13;
+	int wMenuItem[COUNTOF(topicName) - 1] = { 0 };
 
-	memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
-
-	do
+	for (; ; )
 	{
-		memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
-
-		temp2 = 0;
-
-		for (temp = 0; temp < TOPICS; temp++)
+		if (restart)
 		{
-			if (topicStart[temp] <= page)
+			play_song(SONG_MAPVIEW);
+
+			JE_loadPic(VGAScreen2, 2, false);
+		}
+
+		if (topic > 1)
+		{
+			if (!helpSystemPage(&topic, &restart))
+				return;
+
+			selectedIndex = (size_t)topic - 1;
+			topic = 1;
+			continue;
+		}
+
+		// Restore background.
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, (size_t)VGAScreen->pitch * VGAScreen->h);
+
+		// Draw header.
+		draw_font_hv_shadow(VGAScreen, xCenter, yMenuHeader, topicName[0], large_font, centered, 15, -3, false, 2);
+
+		// Draw menu items.
+		for (size_t i = 0; i < menuItemsCount; ++i)
+		{
+			const char *const text = topicName[i + 1];
+
+			wMenuItem[i] = JE_textWidth(text, normal_font);
+			const int y = yMenuItems + dyMenuItems * i;
+
+			const bool selected = i == selectedIndex;
+
+			draw_font_hv_shadow(VGAScreen, xCenter, y, text, normal_font, centered, 15, -3 + (selected ? 2 : 0), false, 2);
+		}
+
+		mouseCursor = MOUSE_POINTER_NORMAL;
+
+		if (restart)
+		{
+			fade_palette(colors, 10, 0, 255);
+
+			restart = false;
+		}
+
+		service_SDL_events(true);
+
+		JE_mouseStart();
+		JE_showVGA();
+		JE_mouseReplace();
+
+		bool mouseMoved = false;
+		do
+		{
+			SDL_Delay(16);
+
+			Uint16 oldMouseX = mouse_x;
+			Uint16 oldMouseY = mouse_y;
+
+			push_joysticks_as_keyboard();
+			service_SDL_events(false);
+
+			mouseMoved = mouse_x != oldMouseX || mouse_y != oldMouseY;
+		} while (!(newkey || newmouse || mouseMoved));
+
+		// Handle interaction.
+
+		bool action = false;
+		bool done = false;
+
+		if (mouseMoved || newmouse)
+		{
+			// Find menu item that was hovered or clicked.
+			for (size_t i = 0; i < menuItemsCount; ++i)
 			{
-				temp2 = temp;
+				const int xMenuItem = xCenter - wMenuItem[i] / 2;
+				if (mouse_x >= xMenuItem && mouse_x < xMenuItem + wMenuItem[i])
+				{
+					const int yMenuItem = yMenuItems + dyMenuItems * i;
+					if (mouse_y >= yMenuItem && mouse_y < yMenuItem + hMenuItem)
+					{
+						if (selectedIndex != i)
+						{
+							JE_playSampleNum(S_CURSOR);
+
+							selectedIndex = i;
+						}
+
+						if (newmouse && lastmouse_but == SDL_BUTTON_LEFT &&
+						    lastmouse_x >= xMenuItem && lastmouse_x < xMenuItem + wMenuItem[i] &&
+						    lastmouse_y >= yMenuItem && lastmouse_y < yMenuItem + hMenuItem)
+						{
+							action = true;
+						}
+
+						break;
+					}
+				}
 			}
 		}
 
-		if (page > 0)
+		if (newmouse)
 		{
-			JE_char buf[128];
+			if (lastmouse_but == SDL_BUTTON_RIGHT)
+			{
+				JE_playSampleNum(S_SPRING);
 
-			sprintf(buf, "%s %d", miscText[24], page-topicStart[temp2]+1);
-			JE_outText(VGAScreen, 10, 192, buf, 13, 5);
+				done = true;
+			}
+		}
+		else if (newkey)
+		{
+			switch (lastkey_scan)
+			{
+			case SDL_SCANCODE_UP:
+			{
+				JE_playSampleNum(S_CURSOR);
 
-			sprintf(buf, "%s %d of %d", miscText[25], page, MAX_PAGE);
-			JE_outText(VGAScreen, 220, 192, buf, 13, 5);
+				selectedIndex = selectedIndex == 0
+					? menuItemsCount - 1
+					: selectedIndex - 1;
+				break;
+			}
+			case SDL_SCANCODE_DOWN:
+			{
+				JE_playSampleNum(S_CURSOR);
 
-			JE_dString(VGAScreen, JE_fontCenter(topicName[temp2], SMALL_FONT_SHAPES), 1, topicName[temp2], SMALL_FONT_SHAPES);
+				selectedIndex = selectedIndex == menuItemsCount - 1
+					? 0
+					: selectedIndex + 1;
+				break;
+			}
+			case SDL_SCANCODE_SPACE:
+			case SDL_SCANCODE_RETURN:
+			{
+				action = true;
+				break;
+			}
+			case SDL_SCANCODE_ESCAPE:
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+				break;
+			}
+			default:
+				break;
+			}
 		}
 
-		menu = 0;
+		if (action)
+		{
+			JE_playSampleNum(S_SELECT);
+
+			topic = selectedIndex + 2;
+
+			if (selectedIndex == menuItemsCount - 1)
+				done = true;
+		}
+
+		if (done)
+		{
+			fade_black(15);
+
+			return;
+		}
+	}
+}
+
+static bool helpSystemPage( Uint8 *topic, bool *restart )
+{
+	Uint8 page = topicStart[*topic - 1];
+
+	const int xCenter = 320 / 2;
+
+	for (; ; )
+	{
+		if (page == 0)
+		{
+			*topic = 1;
+			return true;
+		}
+		else if (page > MAX_PAGE)
+		{
+			*topic = COUNTOF(topicName) - 1;
+			return true;
+		}
+
+		for (Uint8 temp = 0; temp < COUNTOF(topicName); ++temp)
+		{
+			if (topicStart[temp] <= page)
+				*topic = temp + 1;
+			else
+				break;
+		}
+
+		// Restore background.
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, (size_t)VGAScreen->pitch * VGAScreen->h);
+
+		fill_rectangle_wh(VGAScreen, 0, 192, 320, 8, 0);
+
+		const char *const text = topicName[*topic - 1];
+
+		// Draw header.
+		draw_font_hv_shadow(VGAScreen, xCenter, 1, text, normal_font, centered, 15, -3, false, 2);
+
+		// Draw footer.
+		JE_char buffer[128];
+
+		snprintf(buffer, sizeof buffer, "%s %d", miscText[24], page - topicStart[*topic - 1] + 1);
+		draw_font_hv(VGAScreen, 10, 192, buffer, small_font, left_aligned, 13, 5);
+
+		snprintf(buffer, sizeof buffer, "%s %d of %d", miscText[25], page, MAX_PAGE);
+		draw_font_hv(VGAScreen, 320 - 10, 192, buffer, small_font, right_aligned, 13, 5);
+
+		// Draw text.
 
 		helpBoxBrightness = 3;
 		verticalHeight = 8;
 
 		switch (page)
 		{
-			case 0:
-				menu = 2;
-				if (lastPage == MAX_PAGE)
-				{
-					menu = TOPICS;
-				}
-				JE_dString(VGAScreen, JE_fontCenter(topicName[0], FONT_SHAPES), 30, topicName[0], FONT_SHAPES);
-
-				do
-				{
-					for (temp = 1; temp <= TOPICS; temp++)
-					{
-						char buf[21+1];
-
-						if (temp == menu-1)
-						{
-							strcpy(buf+1, topicName[temp]);
-							buf[0] = '~';
-						} else {
-							strcpy(buf, topicName[temp]);
-						}
-
-						JE_dString(VGAScreen, JE_fontCenter(topicName[temp], SMALL_FONT_SHAPES), temp * 20 + 40, buf, SMALL_FONT_SHAPES);
-					}
-
-					//JE_waitRetrace();  didn't do anything anyway?
-					JE_showVGA();
-
-					tempW = 0;
-					JE_textMenuWait(&tempW, false);
-					if (newkey)
-					{
-						switch (lastkey_scan)
-						{
-							case SDL_SCANCODE_UP:
-								menu--;
-								if (menu < 2)
-								{
-									menu = TOPICS;
-								}
-								JE_playSampleNum(S_CURSOR);
-								break;
-							case SDL_SCANCODE_DOWN:
-								menu++;
-								if (menu > TOPICS)
-								{
-									menu = 2;
-								}
-								JE_playSampleNum(S_CURSOR);
-								break;
-							default:
-								break;
-						}
-					}
-				} while (!(lastkey_scan == SDL_SCANCODE_ESCAPE || lastkey_scan == SDL_SCANCODE_RETURN));
-
-				if (lastkey_scan == SDL_SCANCODE_RETURN)
-				{
-					page = topicStart[menu-1];
-					JE_playSampleNum(S_CLICK);
-				}
-
-				break;
-			case 1: /* One-Player Menu */
-				JE_HBox(VGAScreen, 10,  20,  2, 60);
-				JE_HBox(VGAScreen, 10,  50,  5, 60);
-				JE_HBox(VGAScreen, 10,  80, 21, 60);
-				JE_HBox(VGAScreen, 10, 110,  1, 60);
-				JE_HBox(VGAScreen, 10, 140, 28, 60);
-				break;
-			case 2: /* Two-Player Menu */
-				JE_HBox(VGAScreen, 10,  20,  1, 60);
-				JE_HBox(VGAScreen, 10,  60,  2, 60);
-				JE_HBox(VGAScreen, 10, 100, 21, 60);
-				JE_HBox(VGAScreen, 10, 140, 28, 60);
-				break;
-			case 3: /* Upgrade Ship */
-				JE_HBox(VGAScreen, 10,  20,  5, 60);
-				JE_HBox(VGAScreen, 10,  70,  6, 60);
-				JE_HBox(VGAScreen, 10, 110,  7, 60);
-				break;
-			case 4:
-				JE_HBox(VGAScreen, 10,  20,  8, 60);
-				JE_HBox(VGAScreen, 10,  55,  9, 60);
-				JE_HBox(VGAScreen, 10,  87, 10, 60);
-				JE_HBox(VGAScreen, 10, 120, 11, 60);
-				JE_HBox(VGAScreen, 10, 170, 13, 60);
-				break;
-			case 5:
-				JE_HBox(VGAScreen, 10,  20, 14, 60);
-				JE_HBox(VGAScreen, 10,  80, 15, 60);
-				JE_HBox(VGAScreen, 10, 120, 16, 60);
-				break;
-			case 6:
-				JE_HBox(VGAScreen, 10,  20, 17, 60);
-				JE_HBox(VGAScreen, 10,  40, 18, 60);
-				JE_HBox(VGAScreen, 10, 130, 20, 60);
-				break;
-			case 7: /* Options */
-				JE_HBox(VGAScreen, 10,  20, 21, 60);
-				JE_HBox(VGAScreen, 10,  70, 22, 60);
-				JE_HBox(VGAScreen, 10, 110, 23, 60);
-				JE_HBox(VGAScreen, 10, 140, 24, 60);
-				break;
-			case 8:
-				JE_HBox(VGAScreen, 10,  20, 25, 60);
-				JE_HBox(VGAScreen, 10,  60, 26, 60);
-				JE_HBox(VGAScreen, 10, 100, 27, 60);
-				JE_HBox(VGAScreen, 10, 140, 28, 60);
-				JE_HBox(VGAScreen, 10, 170, 29, 60);
-				break;
+		case 1: /* One-Player Menu */
+			JE_HBox(VGAScreen, 10,  20,  2, 60);
+			JE_HBox(VGAScreen, 10,  50,  5, 60);
+			JE_HBox(VGAScreen, 10,  80, 21, 60);
+			JE_HBox(VGAScreen, 10, 110,  1, 60);
+			JE_HBox(VGAScreen, 10, 140, 28, 60);
+			break;
+		case 2: /* Two-Player Menu */
+			JE_HBox(VGAScreen, 10,  20,  1, 60);
+			JE_HBox(VGAScreen, 10,  60,  2, 60);
+			JE_HBox(VGAScreen, 10, 100, 21, 60);
+			JE_HBox(VGAScreen, 10, 140, 28, 60);
+			break;
+		case 3: /* Upgrade Ship */
+			JE_HBox(VGAScreen, 10,  20,  5, 60);
+			JE_HBox(VGAScreen, 10,  70,  6, 60);
+			JE_HBox(VGAScreen, 10, 110,  7, 60);
+			break;
+		case 4:
+			JE_HBox(VGAScreen, 10,  20,  8, 60);
+			JE_HBox(VGAScreen, 10,  55,  9, 60);
+			JE_HBox(VGAScreen, 10,  87, 10, 60);
+			JE_HBox(VGAScreen, 10, 120, 11, 60);
+			JE_HBox(VGAScreen, 10, 170, 13, 60);
+			break;
+		case 5:
+			JE_HBox(VGAScreen, 10,  20, 14, 60);
+			JE_HBox(VGAScreen, 10,  80, 15, 60);
+			JE_HBox(VGAScreen, 10, 120, 16, 60);
+			break;
+		case 6:
+			JE_HBox(VGAScreen, 10,  20, 17, 60);
+			JE_HBox(VGAScreen, 10,  40, 18, 60);
+			JE_HBox(VGAScreen, 10, 130, 20, 60);
+			break;
+		case 7: /* Options */
+			JE_HBox(VGAScreen, 10,  20, 21, 60);
+			JE_HBox(VGAScreen, 10,  70, 22, 60);
+			JE_HBox(VGAScreen, 10, 110, 23, 60);
+			JE_HBox(VGAScreen, 10, 140, 24, 60);
+			break;
+		case 8:
+			JE_HBox(VGAScreen, 10,  20, 25, 60);
+			JE_HBox(VGAScreen, 10,  60, 26, 60);
+			JE_HBox(VGAScreen, 10, 100, 27, 60);
+			JE_HBox(VGAScreen, 10, 140, 28, 60);
+			JE_HBox(VGAScreen, 10, 170, 29, 60);
+			break;
 		}
 
 		helpBoxBrightness = 1;
 		verticalHeight = 7;
 
-		lastPage = page;
-
-		if (menu == 0)
+		if (*restart)
 		{
-			do {
-				setjasondelay(3);
+			fade_palette(colors, 10, 0, 255);
 
-				push_joysticks_as_keyboard();
-				service_SDL_events(true);
+			*restart = false;
+		}
 
-				JE_showVGA();
+		do
+		{
+			mouseCursor = mouse_x < xCenter ? MOUSE_POINTER_LEFT : MOUSE_POINTER_RIGHT;
 
-				wait_delay();
-			} while (!newkey && !newmouse);
+			service_SDL_events(true);
 
-			wait_noinput(false, true, false);
+			JE_mouseStart();
+			JE_showVGA();
+			JE_mouseReplace();
 
-			if (newmouse)
+			SDL_Delay(16);
+
+			push_joysticks_as_keyboard();
+			service_SDL_events(false);
+		} while (!(newkey || newmouse));
+
+		// Handle interaction.
+
+		bool done = false;
+
+		if (newmouse)
+		{
+			switch (lastmouse_but)
 			{
-				switch (lastmouse_but)
-				{
-					case SDL_BUTTON_LEFT:
-						lastkey_scan = SDL_SCANCODE_RIGHT;
-						break;
-					case SDL_BUTTON_RIGHT:
-						lastkey_scan = SDL_SCANCODE_LEFT;
-						break;
-					case SDL_BUTTON_MIDDLE:
-						lastkey_scan = SDL_SCANCODE_ESCAPE;
-						break;
-				}
-				do
-				{
-					service_SDL_events(false);
-				} while (mousedown);
-				newkey = true;
+			case SDL_BUTTON_LEFT:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				if (mouse_x < xCenter)
+					page -= 1;
+				else
+					page += 1;
+				break;
 			}
-
-			if (newkey)
+			case SDL_BUTTON_RIGHT:
 			{
-				switch (lastkey_scan)
-				{
-					case SDL_SCANCODE_LEFT:
-					case SDL_SCANCODE_UP:
-					case SDL_SCANCODE_PAGEUP:
-						page--;
-						JE_playSampleNum(S_CURSOR);
-						break;
-					case SDL_SCANCODE_RIGHT:
-					case SDL_SCANCODE_DOWN:
-					case SDL_SCANCODE_PAGEDOWN:
-					case SDL_SCANCODE_RETURN:
-					case SDL_SCANCODE_SPACE:
-						if (page == MAX_PAGE)
-						{
-							page = 0;
-						} else {
-							page++;
-						}
-						JE_playSampleNum(S_CURSOR);
-						break;
-					case SDL_SCANCODE_F1:
-						page = 0;
-						JE_playSampleNum(S_CURSOR);
-						break;
-					default:
-						break;
-				}
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		else if (newkey)
+		{
+			switch (lastkey_scan)
+			{
+			case SDL_SCANCODE_LEFT:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				page -= 1;
+				break;
+			}
+			case SDL_SCANCODE_RIGHT:
+			case SDL_SCANCODE_SPACE:
+			case SDL_SCANCODE_RETURN:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				page += 1;
+				break;
+			}
+			case SDL_SCANCODE_ESCAPE:
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+				break;
+			}
+			default:
+				break;
 			}
 		}
 
-		if (page == 255)
+		if (done)
 		{
-			lastkey_scan = SDL_SCANCODE_ESCAPE;
+			fade_black(15);
+
+			return false;
 		}
-	} while (lastkey_scan != SDL_SCANCODE_ESCAPE);
+	}
 }
 
 // cost to upgrade a weapon power from power-1 (where power == 0 indicates an unupgraded weapon)
@@ -482,209 +625,300 @@ ulong JE_getCost( JE_byte itemType, JE_word itemNum )
 	return cost;
 }
 
-void JE_loadScreen( void )
+bool JE_loadScreen( void )
 {
-	JE_boolean quit;
-	JE_byte sel, screen, min = 0, max = 0;
-	char *tempstr;
-	char *tempstr2;
-	JE_boolean mal_str = false;
-	int len;
+	if (shopSpriteSheet.data == NULL)
+		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer and arrow sprites
 
-	tempstr = NULL;
+	bool restart = true;
 
-	free_sprite2s(&shapes6);
-	JE_loadCompShapes(&shapes6, '1');  // need arrow sprites
+	size_t playersIndex = 0;
+	const size_t menuItemsCount = 12;
+	size_t selectedIndex = 0;
 
-	fade_black(10);
-	JE_loadPic(VGAScreen, 2, false);
-	JE_showVGA();
-	fade_palette(colors, 10, 0, 255);
+	const int xCenter = 320 / 2;
+	const int yMenuHeader = 5;
+	const int xMenuItem = 10;
+	const int xMenuItemName = xMenuItem;
+	const int xMenuItemLastLevel = 120;
+	const int xMenuItemEpisode = 250;
+	const int wMenuItem = 300;
+	const int yMenuItems = 30;
+	const int dyMenuItems = 13;
+	const int hMenuItem = 8;
+	const int xLeftControl = 83;
+	const int xRightControl = 213;
+	const int wControl = 24;
+	const int yControls = 179;
 
-	screen = 1;
-	sel = 1;
-	quit = false;
-
-	memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
-
-	do
+	for (; ; )
 	{
-		while (mousedown)
+		if (restart)
 		{
-			service_SDL_events(false);
-			tempX = mouse_x;
-			tempY = mouse_y;
+			JE_loadPic(VGAScreen2, 2, false);
+			fill_rectangle_wh(VGAScreen2, 0, 192, 320, 8, 0);
 		}
 
-		memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+		// Restore background.
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, (size_t)VGAScreen->pitch * VGAScreen->h);
 
-		JE_dString(VGAScreen, JE_fontCenter(miscText[38 + screen - 1], FONT_SHAPES), 5, miscText[38 + screen - 1], FONT_SHAPES);
+		// Draw header.
+		draw_font_hv_shadow(VGAScreen, xCenter, yMenuHeader, miscText[38 + playersIndex], large_font, centered, 15, -3, false, 2);
 
-		switch (screen)
+		// Draw menu items.
+
+		for (size_t i = 0; i < menuItemsCount; ++i)
 		{
-		case 1:
-			min = 1;
-			max = 12;
-			break;
-		case 2:
-			min = 12;
-			max = 23;
-		}
+			const int y = yMenuItems + dyMenuItems * i;
 
-		/* SYN: Go through text line by line */
-		for (x = min; x <= max; x++)
-		{
-			tempY = 30 + (x - min) * 13;
+			const bool selected = i == selectedIndex;
 
-			if (x == max)
+			if (i == menuItemsCount - 1)
 			{
-				/* Last line is return to main menu, not a save game */
-				if (mal_str)
-				{
-					free(tempstr);
-					mal_str = false;
-				}
-				tempstr = miscText[34 - 1];
-
-				if (x == sel) /* Highlight if selected */
-				{
-					temp2 = 254;
-				} else {
-					temp2 = 250;
-				}
-			} else {
-				if (x == sel) /* Highlight if selected */
-				{
-					temp2 = 254;
-				} else {
-					temp2 = 250 - ((saveFiles[x - 1].level == 0) << 1);
-				}
-
-				if (saveFiles[x - 1].level == 0) /* I think this means the save file is unused */
-				{
-					if (mal_str)
-					{
-						free(tempstr);
-						mal_str = false;
-					}
-					tempstr = miscText[3 - 1];
-				} else {
-					if (mal_str)
-					{
-						free(tempstr);
-						mal_str = false;
-					}
-					tempstr = saveFiles[x - 1].name;
-				}
+				JE_textShade(VGAScreen, xMenuItemName, y, miscText[33], 13, selected ? 6 : 2, FULL_SHADE);
+				continue;
 			}
 
-			/* Write first column text */
-			JE_textShade(VGAScreen, 10, tempY, tempstr, 13, (temp2 % 16) - 8, FULL_SHADE);
+			const JE_SaveFileType *const saveFile = &saveFiles[playersIndex * 11 + i];
 
-			if (x < max) /* Write additional columns for all but the last row */
+			const bool disabled = saveFile->level == 0;
+
+			char buffer[22];
+
+			if (disabled)
 			{
-				if (saveFiles[x - 1].level == 0)
-				{
-					if (mal_str)
-					{
-						free(tempstr);
-					}
-					tempstr = malloc(7);
-					mal_str = true;
-					strcpy(tempstr, "-----"); /* Unused save slot */
-				} else {
-					tempstr = saveFiles[x - 1].levelName;
-					tempstr2 = malloc(5 + strlen(miscTextB[2-1]));
-					sprintf(tempstr2, "%s %d", miscTextB[2-1], saveFiles[x - 1].episode);
-					JE_textShade(VGAScreen, 250, tempY, tempstr2, 5, (temp2 % 16) - 8, FULL_SHADE);
-					free(tempstr2);
-				}
+				JE_textShade(VGAScreen, xMenuItemName, y, miscText[2], 13, selected ? 6 : 0, FULL_SHADE);
 
-				len = strlen(miscTextB[3-1]) + 2 + strlen(tempstr);
-				tempstr2 = malloc(len);
-				sprintf(tempstr2, "%s %s", miscTextB[3 - 1], tempstr);
-				JE_textShade(VGAScreen, 120, tempY, tempstr2, 5, (temp2 % 16) - 8, FULL_SHADE);
-				free(tempstr2);
+				snprintf(buffer, sizeof buffer, "%s -----", miscTextB[2]);
+				JE_textShade(VGAScreen, xMenuItemLastLevel, y, buffer, 5, selected ? 6 : 0, FULL_SHADE);
 			}
+			else
+			{
+				JE_textShade(VGAScreen, xMenuItemName, y, saveFile->name, 13, selected ? 6 : 2, FULL_SHADE);
 
+				snprintf(buffer, sizeof buffer, "%s %s", miscTextB[2], saveFile->levelName);
+				JE_textShade(VGAScreen, xMenuItemLastLevel, y, buffer, 5, selected ? 6 : 2, FULL_SHADE);
+
+				snprintf(buffer, sizeof buffer, "%s %u", miscTextB[1], saveFile->episode);
+				JE_textShade(VGAScreen, xMenuItemEpisode, y, buffer, 5, selected ? 6 : 2, FULL_SHADE);
+			}
 		}
 
-		if (screen == 2)
-		{
-			blit_sprite2x2(VGAScreen, 90, 180, shapes6, 279);
-		}
-		if (screen == 1)
-		{
-			blit_sprite2x2(VGAScreen, 220, 180, shapes6, 281);
-		}
+		// Draw paging controls.
+
+		const bool leftControlVisible = playersIndex > 0;
+		const bool rightControlVisible = playersIndex < 1;
+
+		if (leftControlVisible)
+			blit_sprite2x2(VGAScreen, xLeftControl, yControls, shopSpriteSheet, 279);
+
+		if (rightControlVisible)
+			blit_sprite2x2(VGAScreen, xRightControl, yControls, shopSpriteSheet, 281);
 
 		helpBoxColor = 15;
-		JE_helpBox(VGAScreen, 110, 182, miscText[56-1], 25);
+		JE_helpBox(VGAScreen, 103, 182, miscText[55], 25);
 
+		if (restart)
+		{
+			mouseCursor = MOUSE_POINTER_NORMAL;
+
+			fade_palette(colors, 10, 0, 255);
+
+			restart = false;
+		}
+
+		service_SDL_events(true);
+
+		JE_mouseStart();
 		JE_showVGA();
+		JE_mouseReplace();
 
-		tempW = 0;
-		JE_textMenuWait(&tempW, false);
+		bool mouseMoved = false;
+		do
+		{
+			SDL_Delay(16);
 
+			Uint16 oldMouseX = mouse_x;
+			Uint16 oldMouseY = mouse_y;
 
-		if (newkey)
+			push_joysticks_as_keyboard();
+			service_SDL_events(false);
+
+			mouseMoved = mouse_x != oldMouseX || mouse_y != oldMouseY;
+		} while (!(newkey || newmouse || mouseMoved));
+
+		// Handle interaction.
+
+		bool leftAction = false;
+		bool rightAction = false;
+		bool action = false;
+		bool done = false;
+
+		if (mouseMoved || newmouse)
+		{
+			if (leftControlVisible &&
+			    mouse_y >= yControls &&
+			    mouse_x >= xLeftControl &&
+			    mouse_x < xLeftControl + wControl)
+			{
+				if (newmouse && lastmouse_but == SDL_BUTTON_LEFT)
+				{
+					JE_playSampleNum(S_CURSOR);
+
+					leftAction = true;
+				}
+			}
+			else if (rightControlVisible &&
+			         mouse_y >= yControls &&
+			         mouse_x >= xRightControl &&
+			         mouse_x < xRightControl + wControl)
+			{
+				if (newmouse && lastmouse_but == SDL_BUTTON_LEFT)
+				{
+					JE_playSampleNum(S_CURSOR);
+
+					rightAction = true;
+				}
+			}
+			else
+			{
+				// Find menu item that was hovered or clicked.
+				if (mouse_x >= xMenuItem && mouse_x < xMenuItem + wMenuItem)
+				{
+					for (size_t i = 0; i < menuItemsCount; ++i)
+					{
+						const int yMenuItem = yMenuItems + dyMenuItems * i;
+						if (mouse_y >= yMenuItem && mouse_y < yMenuItem + hMenuItem)
+						{
+							if (selectedIndex != i)
+							{
+								JE_playSampleNum(S_CURSOR);
+
+								selectedIndex = i;
+							}
+
+							if (newmouse && lastmouse_but == SDL_BUTTON_LEFT &&
+							    lastmouse_x >= xMenuItem && lastmouse_x < xMenuItem + wMenuItem &&
+							    lastmouse_y >= yMenuItem && lastmouse_y < yMenuItem + hMenuItem)
+							{
+								action = true;
+							}
+
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		if (newmouse)
+		{
+			if (lastmouse_but == SDL_BUTTON_RIGHT)
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+			}
+		}
+		else if (newkey)
 		{
 			switch (lastkey_scan)
 			{
-			case SDL_SCANCODE_UP:
-				sel--;
-				if (sel < min)
-				{
-					sel = max;
-				}
-				JE_playSampleNum(S_CURSOR);
-				break;
-			case SDL_SCANCODE_DOWN:
-				sel++;
-				if (sel > max)
-				{
-					sel = min;
-				}
-				JE_playSampleNum(S_CURSOR);
-				break;
 			case SDL_SCANCODE_LEFT:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				leftAction = true;
+				break;
+			}
 			case SDL_SCANCODE_RIGHT:
-				if (screen == 1)
-				{
-					screen = 2;
-					sel += 11;
-				} else {
-					screen = 1;
-					sel -= 11;
-				}
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				rightAction = true;
 				break;
+			}
+			case SDL_SCANCODE_UP:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				selectedIndex = selectedIndex == 0
+					? menuItemsCount - 1
+					: selectedIndex - 1;
+				break;
+			}
+			case SDL_SCANCODE_DOWN:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				selectedIndex = selectedIndex == menuItemsCount - 1
+					? 0
+					: selectedIndex + 1;
+				break;
+			}
+			case SDL_SCANCODE_SPACE:
 			case SDL_SCANCODE_RETURN:
-				if (sel < max)
-				{
-					if (saveFiles[sel - 1].level > 0)
-					{
-						JE_playSampleNum (S_SELECT);
-						performSave = false;
-						JE_operation(sel);
-						quit = true;
-					} else {
-						JE_playSampleNum (S_CLINK);
-					}
-				} else {
-					quit = true;
-				}
-
-
+			{
+				action = true;
 				break;
+			}
 			case SDL_SCANCODE_ESCAPE:
-				quit = true;
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
 				break;
+			}
 			default:
 				break;
 			}
-
 		}
-	} while (!quit);
+
+		if (leftAction)
+		{
+			playersIndex = playersIndex == 0 ? 1 : 0;
+		}
+		else if (rightAction)
+		{
+			playersIndex = playersIndex == 1 ? 0 : 1;
+		}
+		else if (action)
+		{
+			if (selectedIndex == menuItemsCount - 1)  // "Exit to Main Menu"
+			{
+				JE_playSampleNum(S_SELECT);
+
+				done = true;
+			}
+			else
+			{
+				const size_t saveFileIndex = playersIndex * 11 + selectedIndex;
+
+				if (saveFiles[saveFileIndex].level == 0)  // "EMPTY SLOT"
+				{
+					JE_playSampleNum(S_CLINK);
+				}
+				else
+				{
+					JE_playSampleNum(S_SELECT);
+
+					performSave = false;
+					JE_operation(saveFileIndex + 1);
+
+					fade_black(15);
+
+					return gameLoaded;
+				}
+			}
+		}
+
+		if (done)
+		{
+			fade_black(15);
+
+			return false;
+		}
+	}
 }
 
 ulong JE_totalScore( const Player *this_player )
@@ -752,13 +986,6 @@ void JE_nextEpisode( void )
 
 	if (jumpBackToEpisode1)
 	{
-		// shareware version check
-		if (episodeNum == 1 &&
-			!isNetworkGame && !constantPlay)
-		{
-			// JE_loadOrderingInfo();
-		}
-
 		if (episodeNum > 2 &&
 			!constantPlay)
 		{
@@ -876,136 +1103,210 @@ void JE_sortHighScores( void )
 
 void JE_highScoreScreen( void )
 {
-	int min = 1;
-	int max = 3;
+	if (shopSpriteSheet.data == NULL)
+		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer and arrow sprites
 
-	int x, z;
-	short int chg;
-	int quit;
-	char scoretemp[32];
+	bool restart = true;
 
-	free_sprite2s(&shapes6);
-	JE_loadCompShapes(&shapes6, '1');  // need arrow sprites
+	size_t episodeIndex = 0;
+	// Save file only has space for scores for 3 episodes.
+	const size_t episodeCount = 3;
 
-	fade_black(10);
-	JE_loadPic(VGAScreen, 2, false);
-	JE_showVGA();
-	fade_palette(colors, 10, 0, 255);
+	const int xCenter = 320 / 2;
+	const int yMenuHeader = 3;
+	const int yEpisodeHeader = 30;
+	const int xLeftControl = 83;
+	const int xRightControl = 213;
+	const int wControl = 24;
+	const int yControls = 179;
 
-	quit = false;
-	x = 1;
-	chg = 1;
-
-	memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
-
-	do
+	for (; ; )
 	{
-		if (episodeAvail[x-1])
+		if (restart)
 		{
-			memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+			JE_loadPic(VGAScreen2, 2, false);
+			fill_rectangle_wh(VGAScreen2, 0, 192, 320, 8, 0);
 
-			JE_dString(VGAScreen, JE_fontCenter(miscText[51 - 1], FONT_SHAPES), 03, miscText[51 - 1], FONT_SHAPES);
-			JE_dString(VGAScreen, JE_fontCenter(episode_name[x], SMALL_FONT_SHAPES), 30, episode_name[x], SMALL_FONT_SHAPES);
-
-			/* Player 1 */
-			temp = (x * 6) - 6;
-
-			JE_dString(VGAScreen, JE_fontCenter(miscText[47 - 1], SMALL_FONT_SHAPES), 55, miscText[47 - 1], SMALL_FONT_SHAPES);
-
-			for (z = 0; z < 3; z++)
-			{
-				int difficulty = saveFiles[temp + z].highScoreDiff;
-				if (difficulty > 9)
-				{
-					saveFiles[temp + z].highScoreDiff = 0;
-					difficulty = 0;
-				}
-				sprintf(scoretemp, "~#%d:~ %d", z + 1, saveFiles[temp+z].highScore1);
-				JE_textShade(VGAScreen, 250, ((z+1) * 10) + 65 , difficultyNameB[difficulty], 15, difficulty + (difficulty == 0 ? 0 : -1), FULL_SHADE);
-				JE_textShade(VGAScreen, 20, ((z+1) * 10) + 65 , scoretemp, 15, 0, FULL_SHADE);
-				JE_textShade(VGAScreen, 110, ((z+1) * 10) + 65 , saveFiles[temp + z].highScoreName, 15, 2, FULL_SHADE);
-			}
-
-			/* Player 2 */
-			temp += 3;
-
-			JE_dString(VGAScreen, JE_fontCenter( miscText[48 - 1], SMALL_FONT_SHAPES), 120, miscText[48 - 1], SMALL_FONT_SHAPES);
-
-			/*{        textshade(20,125,misctext[49],15,3,_FullShade);
-			  textshade(80,125,misctext[50],15,3,_FullShade);}*/
-
-			for (z = 0; z < 3; z++)
-			{
-				int difficulty = saveFiles[temp + z].highScoreDiff;
-				if (difficulty > 9)
-				{
-					saveFiles[temp + z].highScoreDiff = 0;
-					difficulty = 0;
-				}
-				sprintf(scoretemp, "~#%d:~ %d", z + 1, saveFiles[temp+z].highScore1); /* Not .highScore2 for some reason */
-				JE_textShade(VGAScreen, 250, ((z+1) * 10) + 125 , difficultyNameB[difficulty], 15, difficulty + (difficulty == 0 ? 0 : -1), FULL_SHADE);
-				JE_textShade(VGAScreen, 20, ((z+1) * 10) + 125 , scoretemp, 15, 0, FULL_SHADE);
-				JE_textShade(VGAScreen, 110, ((z+1) * 10) + 125 , saveFiles[temp + z].highScoreName, 15, 2, FULL_SHADE);
-			}
-
-			if (x > 1)
-			{
-				blit_sprite2x2(VGAScreen,  90, 180, shapes6, 279);
-			}
-
-			if ( ( (x < 2) && episodeAvail[2-1] ) || ( (x < 3) && episodeAvail[3-1] ) )
-			{
-				blit_sprite2x2(VGAScreen,  220, 180, shapes6, 281);
-			}
-
-			helpBoxColor = 15;
-			JE_helpBox(VGAScreen, 110, 182, miscText[57 - 1], 25);
-
-			/* {Dstring(fontcenter(misctext[57],_SmallFontShapes),190,misctext[57],_SmallFontShapes);} */
-
-			JE_showVGA();
-
-			tempW = 0;
-			JE_textMenuWait(&tempW, false);
-
-			if (newkey)
-			{
-				switch (lastkey_scan)
-				{
-				case SDL_SCANCODE_LEFT:
-					x--;
-					chg = -1;
-					break;
-				case SDL_SCANCODE_RIGHT:
-					x++;
-					chg = 1;
-					break;
-				default:
-					break;
-				}
-			}
-
-		} else {
-			x += chg;
+			// Draw header.
+			draw_font_hv_shadow(VGAScreen2, xCenter, yMenuHeader, miscText[50], large_font, centered, 15, -3, false, 2);
 		}
 
-		x = ( x < min ) ? max : ( x > max ) ? min : x;
+		// Restore background and header.
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, (size_t)VGAScreen->pitch * VGAScreen->h);
 
-		if (newkey)
+		const bool disabled = !episodeAvail[episodeIndex];
+
+		// Draw episode header.
+		draw_font_hv_shadow(VGAScreen, xCenter, yEpisodeHeader, episode_name[episodeIndex + 1], normal_font, centered, 15, -3 + (disabled ? -4 : 0), false, 2);
+
+		char buffer[29];
+
+		// Draw 1-player scores.
+
+		draw_font_hv_shadow(VGAScreen, xCenter, 55, miscText[46], normal_font, centered, 15, -3, false, 2);
+
+		for (Uint8 i = 0; i < 3; ++i)
+		{
+			const int y = 75 + 10 * i;
+
+			const JE_SaveFileType *const saveFile = &saveFiles[episodeIndex * 6 + i];
+			const int rank = MIN(saveFile->highScoreDiff, COUNTOF(difficultyNameB) - 1);
+
+			snprintf(buffer, sizeof buffer, "~#%d:~  %ld", i + 1, saveFile->highScore1);
+			JE_textShade(VGAScreen, 20, y, buffer, 15, 0, FULL_SHADE);
+			JE_textShade(VGAScreen, 110, y, saveFile->highScoreName, 15, 2, FULL_SHADE);
+			JE_textShade(VGAScreen, 250, y, difficultyNameB[rank], 15, rank + (rank == 0 ? 0 : -1), FULL_SHADE);
+		}
+
+		// Draw 2-player scores.
+
+		draw_font_hv_shadow(VGAScreen, xCenter, 120, miscText[47], normal_font, centered, 15, -3, false, 2);
+
+		for (Uint8 i = 0; i < 3; ++i)
+		{
+			const int y = 135 + 10 * i;
+
+			const JE_SaveFileType *const saveFile = &saveFiles[episodeIndex * 6 + 3 + i];
+			const int rank = MIN(saveFile->highScoreDiff, COUNTOF(difficultyNameB) - 1);
+
+			snprintf(buffer, sizeof buffer, "~#%d:~  %ld", i + 1, saveFile->highScore1);
+			JE_textShade(VGAScreen, 20, y, buffer, 15, 0, FULL_SHADE);
+			JE_textShade(VGAScreen, 110, y, saveFile->highScoreName, 15, 2, FULL_SHADE);
+			JE_textShade(VGAScreen, 250, y, difficultyNameB[rank], 15, rank + (rank == 0 ? 0 : -1), FULL_SHADE);
+		}
+
+		// Draw paging controls.
+
+		const bool leftControlVisible = episodeIndex > 0;
+		const bool rightControlVisible = episodeIndex < episodeCount - 1;
+
+		if (leftControlVisible)
+			blit_sprite2x2(VGAScreen, xLeftControl, yControls, shopSpriteSheet, 279);
+
+		if (rightControlVisible)
+			blit_sprite2x2(VGAScreen, xRightControl, yControls, shopSpriteSheet, 281);
+
+		helpBoxColor = 15;
+		JE_helpBox(VGAScreen, 103, 182, miscText[56], 25);
+
+		if (restart)
+		{
+			mouseCursor = MOUSE_POINTER_NORMAL;
+
+			fade_palette(colors, 10, 0, 255);
+
+			restart = false;
+		}
+
+		do
+		{
+			service_SDL_events(true);
+
+			JE_mouseStart();
+			JE_showVGA();
+			JE_mouseReplace();
+
+			SDL_Delay(16);
+
+			push_joysticks_as_keyboard();
+			service_SDL_events(false);
+		} while (!(newkey || newmouse));
+
+		// Handle interaction.
+
+		bool leftAction = false;
+		bool rightAction = false;
+		bool done = false;
+
+		if (newmouse)
+		{
+			switch (lastmouse_but)
+			{
+			case SDL_BUTTON_LEFT:
+			{
+				if (leftControlVisible &&
+				    mouse_y >= yControls &&
+				    mouse_x >= xLeftControl &&
+				    mouse_x < xLeftControl + wControl)
+				{
+					JE_playSampleNum(S_CURSOR);
+
+					leftAction = true;
+				}
+				else if (rightControlVisible &&
+				         mouse_y >= yControls &&
+				         mouse_x >= xRightControl &&
+				         mouse_x < xRightControl + wControl)
+				{
+					JE_playSampleNum(S_CURSOR);
+
+					rightAction = true;
+				}
+				break;
+			}
+			case SDL_BUTTON_RIGHT:
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		else if (newkey)
 		{
 			switch (lastkey_scan)
 			{
+			case SDL_SCANCODE_LEFT:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				leftAction = true;
+				break;
+			}
+			case SDL_SCANCODE_RIGHT:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				rightAction = true;
+				break;
+			}
+			case SDL_SCANCODE_SPACE:
 			case SDL_SCANCODE_RETURN:
 			case SDL_SCANCODE_ESCAPE:
-				quit = true;
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
 				break;
+			}
 			default:
 				break;
 			}
 		}
 
-	} while (!quit);
+		if (leftAction)
+		{
+			episodeIndex = episodeIndex == 0
+				? episodeCount - 1
+				: episodeIndex - 1;
+		}
+		else if (rightAction)
+		{
+			episodeIndex = episodeIndex == episodeCount - 1
+				? 0
+				: episodeIndex + 1;
+		}
 
+		if (done)
+		{
+			fade_black(15);
+
+			return;
+		}
+	}
 }
 
 void JE_gammaCorrect_func( JE_byte *col, JE_real r )
@@ -1048,6 +1349,8 @@ JE_boolean JE_gammaCheck( void )
 
 void JE_doInGameSetup( void )
 {
+	mouseSetRelative(false);
+
 	haltGame = false;
 
 #ifdef WITH_NETWORK
@@ -1163,206 +1466,412 @@ void JE_doInGameSetup( void )
 	yourInGameMenuRequest = false;
 
 	//skipStarShowVGA = true;
+
+	mouseSetRelative(true);
 }
 
 JE_boolean JE_inGameSetup( void )
 {
+	bool result = false;
+
 	SDL_Surface *temp_surface = VGAScreen;
 	VGAScreen = VGAScreenSeg; /* side-effect of game_screen */
 
-	JE_boolean returnvalue = false;
-
-	const JE_byte help[6] /* [1..6] */ = {15, 15, 28, 29, 26, 27};
-	JE_byte  sel;
-	JE_boolean quit;
-
-	bool first = true;
-
-	//tempScreenSeg = VGAScreenSeg; /* <MXD> ? should work as VGAScreen */
-
-	quit = false;
-	sel = 1;
-
-	JE_barShade(VGAScreen, 3, 13, 217, 137); /*Main Box*/
-	JE_barShade(VGAScreen, 5, 15, 215, 135);
-
-	JE_barShade(VGAScreen, 3, 143, 257, 157); /*Help Box*/
-	JE_barShade(VGAScreen, 5, 145, 255, 155);
-	memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
-
-	do
+	enum MenuItemIndex
 	{
-		memcpy(VGAScreen->pixels, VGAScreen2->pixels, VGAScreen->pitch * VGAScreen->h);
+		MENU_ITEM_MUSIC_VOLUME = 0,
+		MENU_ITEM_EFFECTS_VOLUME,
+		MENU_ITEM_DETAIL_LEVEL,
+		MENU_ITEM_GAME_SPEED,
+		MENU_ITEM_RETURN_TO_GAME,
+		MENU_ITEM_QUIT,
+	};
 
-		for (x = 0; x < 6; x++)
+	const size_t helpIndexes[] = { 14, 14, 27, 28, 25, 26 };
+
+	if (shopSpriteSheet.data == NULL)
+		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprites
+
+	bool restart = true;
+
+	const size_t menuItemsCount = COUNTOF(inGameText);
+	size_t selectedIndex = MENU_ITEM_MUSIC_VOLUME;
+
+	const int yMenuItems = 20;
+	const int dyMenuItems = 20;
+	const int xMenuItem = 10;
+	const int xMenuItemName = xMenuItem;
+	const int wMenuItemName = 110;
+	const int xMenuItemValue = xMenuItemName + wMenuItemName;
+	const int wMenuItemValue = 90;
+	const int wMenuItem = wMenuItemName + wMenuItemValue;
+	const int hMenuItem = 13;
+
+	for (bool done = false; !done; )
+	{
+		if (restart)
 		{
-			JE_outTextAdjust(VGAScreen, 10, (x + 1) * 20, inGameText[x], 15, ((sel == x+1) << 1) - 4, SMALL_FONT_SHAPES, true);
+			// Main box
+			JE_barShade(VGAScreen, 3, 13, 217, 137);
+			JE_barShade(VGAScreen, 5, 15, 215, 135);
+
+			// Help box
+			JE_barShade(VGAScreen, 3, 143, 257, 157);
+			JE_barShade(VGAScreen, 5, 145, 255, 155);
+
+			memcpy(VGAScreen2->pixels, VGAScreen->pixels, VGAScreen2->pitch * VGAScreen2->h);
+
+			mouseCursor = MOUSE_POINTER_NORMAL;
+
+			restart = false;
 		}
 
-		JE_outTextAdjust(VGAScreen, 120, 3 * 20, detailLevel[processorType-1], 15, ((sel == 3) << 1) - 4, SMALL_FONT_SHAPES, true);
-		JE_outTextAdjust(VGAScreen, 120, 4 * 20, gameSpeedText[gameSpeed-1],   15, ((sel == 4) << 1) - 4, SMALL_FONT_SHAPES, true);
+		// Restore background.
+		memcpy(VGAScreen->pixels, VGAScreen2->pixels, (size_t)VGAScreen->pitch * VGAScreen->h);
 
-		JE_outTextAdjust(VGAScreen, 10, 147, mainMenuHelp[help[sel-1]-1], 14, 6, TINY_FONT, true);
-
-		JE_barDrawShadow(VGAScreen, 120, 20, 1, music_disabled ? 12 : 16, tyrMusicVolume / 12, 3, 13);
-		JE_barDrawShadow(VGAScreen, 120, 40, 1, samples_disabled ? 12 : 16, fxVolume / 12, 3, 13);
-
-		JE_showVGA();
-
-		if (first)
+		// Draw menu items.
+		for (size_t i = 0; i < menuItemsCount; ++i)
 		{
-			first = false;
-			wait_noinput(false, false, true); // TODO: should up the joystick repeat temporarily instead
-		}
+			const int y = yMenuItems + dyMenuItems * i;
 
-		tempW = 0;
-		JE_textMenuWait(&tempW, true);
+			const char *const name = inGameText[i];
 
-		if (inputDetected)
-		{
-			switch (lastkey_scan)
+			const bool selected = i == selectedIndex;
+
+			draw_font_hv_shadow(VGAScreen, xMenuItemName, y, name, normal_font, left_aligned, 15, -4 + (selected ? 2 : 0), false, 2);
+
+			switch (i)
 			{
-				case SDL_SCANCODE_RETURN:
-					JE_playSampleNum(S_SELECT);
-					switch (sel)
-					{
-						case 1:
-							music_disabled = !music_disabled;
-							break;
-						case 2:
-							samples_disabled = !samples_disabled;
-							break;
-						case 3:
-						case 4:
-							sel = 5;
-							break;
-						case 5:
-							quit = true;
-							break;
-						case 6:
-							returnvalue = true;
-							quit = true;
-							if (constantPlay)
-							{
-								JE_tyrianHalt(0);
-							}
-
-							if (isNetworkGame)
-							{ /*Tell other computer to exit*/
-								haltGame = true;
-								playerEndLevel = true;
-							}
-							break;
-					}
-					break;
-				case SDL_SCANCODE_ESCAPE:
-					quit = true;
-					JE_playSampleNum(S_SPRING);
-					break;
-				case SDL_SCANCODE_UP:
-					if (--sel < 1)
-					{
-						sel = 6;
-					}
-					JE_playSampleNum(S_CURSOR);
-					break;
-				case SDL_SCANCODE_DOWN:
-					if (++sel > 6)
-					{
-						sel = 1;
-					}
-					JE_playSampleNum(S_CURSOR);
-					break;
-				case SDL_SCANCODE_LEFT:
-					switch (sel)
-					{
-						case 1:
-							JE_changeVolume(&tyrMusicVolume, -12, &fxVolume, 0);
-							if (music_disabled)
-							{
-								music_disabled = false;
-								restart_song();
-							}
-							break;
-						case 2:
-							JE_changeVolume(&tyrMusicVolume, 0, &fxVolume, -12);
-							samples_disabled = false;
-							break;
-						case 3:
-							if (--processorType < 1)
-							{
-								processorType = 4;
-							}
-							JE_initProcessorType();
-							JE_setNewGameSpeed();
-							break;
-						case 4:
-							if (--gameSpeed < 1)
-							{
-								gameSpeed = 5;
-							}
-							JE_initProcessorType();
-							JE_setNewGameSpeed();
-							break;
-					}
-					if (sel < 5)
-					{
-						JE_playSampleNum(S_CURSOR);
-					}
-					break;
-				case SDL_SCANCODE_RIGHT:
-					switch (sel)
-					{
-						case 1:
-							JE_changeVolume(&tyrMusicVolume, 12, &fxVolume, 0);
-							if (music_disabled)
-							{
-								music_disabled = false;
-								restart_song();
-							}
-							break;
-						case 2:
-							JE_changeVolume(&tyrMusicVolume, 0, &fxVolume, 12);
-							samples_disabled = false;
-							break;
-						case 3:
-							if (++processorType > 4)
-							{
-								processorType = 1;
-							}
-							JE_initProcessorType();
-							JE_setNewGameSpeed();
-							break;
-						case 4:
-							if (++gameSpeed > 5)
-							{
-								gameSpeed = 1;
-							}
-							JE_initProcessorType();
-							JE_setNewGameSpeed();
-							break;
-					}
-					if (sel < 5)
-					{
-						JE_playSampleNum(S_CURSOR);
-					}
-					break;
-				case SDL_SCANCODE_W:
-					if (sel == 3)
-					{
-						processorType = 6;
-						JE_initProcessorType();
-					}
-				default:
-					break;
+			case MENU_ITEM_MUSIC_VOLUME:
+			{
+				JE_barDrawShadow(VGAScreen, xMenuItemValue, y, 1, music_disabled ? 12 : 16, (tyrMusicVolume + 6) / 12, 3, 13);
+				break;
+			}
+			case MENU_ITEM_EFFECTS_VOLUME:
+			{
+				JE_barDrawShadow(VGAScreen, xMenuItemValue, y, 1, samples_disabled ? 12 : 16, (fxVolume + 6) / 12, 3, 13);
+				break;
+			}
+			case MENU_ITEM_DETAIL_LEVEL:
+			{
+				draw_font_hv_shadow(VGAScreen, xMenuItemValue, y, detailLevel[processorType-1], normal_font, left_aligned, 15, -4 + (selected ? 2 : 0), false, 2);
+				break;
+			}
+			case MENU_ITEM_GAME_SPEED:
+			{
+				draw_font_hv_shadow(VGAScreen, xMenuItemValue, y, gameSpeedText[gameSpeed-1], normal_font, left_aligned, 15, -4 + (selected ? 2 : 0), false, 2);
+				break;
+			}
 			}
 		}
 
-	} while (!(quit || haltGame));
+		// Draw help text.
+		JE_outTextAdjust(VGAScreen, 10, 147, mainMenuHelp[helpIndexes[selectedIndex]], 14, 6, TINY_FONT, true);
+
+		service_SDL_events(true);
+
+		JE_mouseStart();
+		JE_showVGA();
+		JE_mouseReplace();
+
+		bool mouseMoved = false;
+		do
+		{
+			SDL_Delay(16);
+
+			Uint16 oldMouseX = mouse_x;
+			Uint16 oldMouseY = mouse_y;
+
+			push_joysticks_as_keyboard();
+			service_SDL_events(false);
+
+			NETWORK_KEEP_ALIVE();
+
+			mouseMoved = mouse_x != oldMouseX || mouse_y != oldMouseY;
+		} while (!(newkey || newmouse || mouseMoved));
+
+		// Handle interaction.
+
+		bool action = false;
+		bool leftAction = false;
+		bool rightAction = false;
+
+		if (mouseMoved || newmouse)
+		{
+			// Find menu item that was hovered or clicked.
+			if (mouse_x >= xMenuItem && mouse_x < xMenuItem + wMenuItem)
+			{
+				for (size_t i = 0; i < menuItemsCount; ++i)
+				{
+					const int yMenuItem = yMenuItems + dyMenuItems * i;
+					if (mouse_y >= yMenuItem && mouse_y < yMenuItem + hMenuItem)
+					{
+						if (selectedIndex != i)
+						{
+							JE_playSampleNum(S_CURSOR);
+
+							selectedIndex = i;
+						}
+
+						if (newmouse && lastmouse_but == SDL_BUTTON_LEFT &&
+						    lastmouse_x >= xMenuItem && lastmouse_x < xMenuItem + wMenuItem &&
+						    lastmouse_y >= yMenuItem && lastmouse_y < yMenuItem + hMenuItem)
+						{
+							// Act on menu item via name.
+							if (lastmouse_x >= xMenuItemName && lastmouse_x < xMenuItemName + wMenuItemName)
+							{
+								action = true;
+							}
+
+							// Act on menu item via value.
+							else if (lastmouse_x >= xMenuItemValue && lastmouse_x < xMenuItemValue + wMenuItemValue)
+							{
+								switch (i)
+								{
+								case MENU_ITEM_MUSIC_VOLUME:
+								{
+									JE_playSampleNum(S_CURSOR);
+
+									const int w = ((255 + 6) / 12) * (3 + 1) - 1;
+
+									int value = (lastmouse_x - xMenuItemValue) * 255 / (w - 1);
+									tyrMusicVolume = MIN(MAX(0, value), 255);
+
+									set_volume(tyrMusicVolume, fxVolume);
+									break;
+								}
+								case MENU_ITEM_EFFECTS_VOLUME:
+								{
+									const int w = ((255 + 6) / 12) * (3 + 1) - 1;
+
+									int value = (lastmouse_x - xMenuItemValue) * 255 / (w - 1);
+									fxVolume = MIN(MAX(0, value), 255);
+
+									JE_calcFXVol();
+
+									set_volume(tyrMusicVolume, fxVolume);
+
+									JE_playSampleNum(S_CURSOR);
+									break;
+								}
+								case MENU_ITEM_DETAIL_LEVEL:
+								case MENU_ITEM_GAME_SPEED:
+								{
+									rightAction = true;
+									break;
+								}
+								default:
+									break;
+								}
+							}
+						}
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (newmouse)
+		{
+			if (lastmouse_but == SDL_BUTTON_RIGHT)
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+			}
+		}
+		else if (newkey)
+		{
+			switch (lastkey_scan)
+			{
+			case SDL_SCANCODE_UP:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				selectedIndex = selectedIndex == 0
+					? menuItemsCount - 1
+					: selectedIndex - 1;
+				break;
+			}
+			case SDL_SCANCODE_DOWN:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				selectedIndex = selectedIndex == menuItemsCount - 1
+					? 0
+					: selectedIndex + 1;
+				break;
+			}
+			case SDL_SCANCODE_LEFT:
+			{
+				leftAction = true;
+				break;
+			}
+			case SDL_SCANCODE_RIGHT:
+			{
+				rightAction = true;
+				break;
+			}
+			case SDL_SCANCODE_SPACE:
+			case SDL_SCANCODE_RETURN:
+			{
+				action = true;
+				break;
+			}
+			case SDL_SCANCODE_ESCAPE:
+			{
+				JE_playSampleNum(S_SPRING);
+
+				done = true;
+				break;
+			}
+			case SDL_SCANCODE_W:
+			{
+				if (selectedIndex == MENU_ITEM_DETAIL_LEVEL)
+				{
+					processorType = 6;
+					JE_initProcessorType();
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+
+		if (action)
+		{
+			switch (selectedIndex)
+			{
+			case MENU_ITEM_MUSIC_VOLUME:
+			{
+				JE_playSampleNum(S_SELECT);
+
+				music_disabled = !music_disabled;
+				break;
+			}
+			case MENU_ITEM_EFFECTS_VOLUME:
+			{
+				samples_disabled = !samples_disabled;
+
+				JE_playSampleNum(S_SELECT);
+				break;
+			}
+			case MENU_ITEM_RETURN_TO_GAME:
+			{
+				JE_playSampleNum(S_SELECT);
+
+				done = true;
+				break;
+			}
+			case MENU_ITEM_QUIT:
+			{
+				JE_playSampleNum(S_SELECT);
+
+				if (constantPlay)
+					JE_tyrianHalt(0);
+
+				if (isNetworkGame)
+				{
+					/*Tell other computer to exit*/
+					haltGame = true;
+					playerEndLevel = true;
+				}
+
+				result = true;
+				done = true;
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		else if (leftAction)
+		{
+			switch (selectedIndex)
+			{
+			case MENU_ITEM_MUSIC_VOLUME:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				JE_changeVolume(&tyrMusicVolume, -12, &fxVolume, 0);
+				break;
+			}
+			case MENU_ITEM_EFFECTS_VOLUME:
+			{
+				JE_changeVolume(&tyrMusicVolume, 0, &fxVolume, -12);
+
+				JE_playSampleNum(S_CURSOR);
+				break;
+			}
+			case MENU_ITEM_DETAIL_LEVEL:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				processorType = processorType > 1 ? processorType - 1 : 4;
+				JE_initProcessorType();
+				JE_setNewGameSpeed();
+				break;
+			}
+			case MENU_ITEM_GAME_SPEED:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				gameSpeed = gameSpeed > 1 ? gameSpeed - 1 : 5;
+				JE_initProcessorType();
+				JE_setNewGameSpeed();
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		else if (rightAction)
+		{
+			switch (selectedIndex)
+			{
+			case MENU_ITEM_MUSIC_VOLUME:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				JE_changeVolume(&tyrMusicVolume, 12, &fxVolume, 0);
+				break;
+			}
+			case MENU_ITEM_EFFECTS_VOLUME:
+			{
+				JE_changeVolume(&tyrMusicVolume, 0, &fxVolume, 12);
+
+				JE_playSampleNum(S_CURSOR);
+				break;
+			}
+			case MENU_ITEM_DETAIL_LEVEL:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				processorType = processorType < 4 ? processorType + 1 : 1;
+				JE_initProcessorType();
+				JE_setNewGameSpeed();
+				break;
+			}
+			case MENU_ITEM_GAME_SPEED:
+			{
+				JE_playSampleNum(S_CURSOR);
+
+				gameSpeed = gameSpeed < 5 ? gameSpeed + 1 : 1;
+				JE_initProcessorType();
+				JE_setNewGameSpeed();
+				break;
+			}
+			default:
+				break;
+			}
+		}
+	}
 
 	VGAScreen = temp_surface; /* side-effect of game_screen */
 
-	return returnvalue;
+	return result;
 }
 
 void JE_inGameHelp( void )
@@ -1399,7 +1908,7 @@ void JE_inGameHelp( void )
 		helpBoxBrightness = 3;
 		JE_HBox(VGAScreen, 40, 43, 34, 44);
 
-		// sheild/armor help
+		// shield/armor help
 		blit_sprite(VGAScreenSeg, 2, 79, OPTION_SHAPES, 42);
 		helpBoxColor = 5;
 		helpBoxBrightness = 3;
@@ -1446,14 +1955,21 @@ void JE_inGameHelp( void )
 	blit_sprite(VGAScreenSeg, 16, 189, OPTION_SHAPES, 36);  // in-game text area
 	JE_outText(VGAScreenSeg, 120 - JE_textWidth(miscText[5-1], TINY_FONT) / 2 + 20, 190, miscText[5-1], 0, 4);
 
-	JE_showVGA();
-
 	do
 	{
-		tempW = 0;
-		JE_textMenuWait(&tempW, true);
-	}
-	while (!inputDetected);
+		service_SDL_events(true);
+
+		JE_mouseStart();
+		JE_showVGA();
+		JE_mouseReplace();
+
+		SDL_Delay(16);
+
+		push_joysticks_as_keyboard();
+		service_SDL_events(false);
+
+		NETWORK_KEEP_ALIVE();
+	} while (!(newkey || newmouse));
 
 	textErase = 1;
 
@@ -1462,8 +1978,8 @@ void JE_inGameHelp( void )
 
 void JE_highScoreCheck( void )
 {
-	free_sprite2s(&shapes6);
-	JE_loadCompShapes(&shapes6, '1');  // need mouse cursor sprite
+	if (shopSpriteSheet.data == NULL)
+		JE_loadCompShapes(&shopSpriteSheet, '1');  // need mouse pointer sprite
 
 	Sint32 temp_score;
 
@@ -1528,14 +2044,7 @@ void JE_highScoreCheck( void )
 				temp = 0;
 
 				JE_barShade(VGAScreen, 65, 55, 255, 155);
-#ifdef VITA
-				char *str = keyboard_vita_get("Enter your name", 29);
-				if(str != NULL) {
-					strcpy(stemp, str);
-				} else {
-					cancel = true;
-				}
-#else
+
 				do
 				{
 					service_SDL_events(true);
@@ -1558,7 +2067,7 @@ void JE_highScoreCheck( void )
 						JE_textShade(VGAScreen, 60, 55, miscText[53], 11, 4, FULL_SHADE);
 					}
 
-					sprintf(buffer, "%s %d", miscText[37], temp_score);
+					sprintf(buffer, "%s %ld", miscText[37], temp_score);
 					JE_textShade(VGAScreen, 70, 70, buffer, 11, 4, FULL_SHADE);
 
 					do
@@ -1593,7 +2102,7 @@ void JE_highScoreCheck( void )
 								break;
 						}
 
-					} while (!newkey && !newmouse);
+					} while (!newkey && !newmouse && !new_text);
 
 					if (!playing)
 						play_song(31);
@@ -1610,62 +2119,44 @@ void JE_highScoreCheck( void )
 							cancel = true;
 						}
 					}
+					else if (new_text)
+					{
+						for (size_t ti = 0U; last_text[ti] != '\0'; ++ti)
+						{
+							const char c = (unsigned char)last_text[ti] <= 127U ? toupper(last_text[ti]) : 0;
+							if ((c == ' ' || font_ascii[(unsigned char)c] != -1) &&
+							    temp < 28)
+							{
+								stemp[temp] = c;
+								temp += 1;
+							}
+						}
+					}
 					else if (newkey)
 					{
-						bool validkey = false;
-						lastkey_char = toupper(lastkey_char);
-						switch(lastkey_char)
+						switch (lastkey_scan)
 						{
-							case ' ':
-							case '-':
-							case '.':
-							case ',':
-							case ':':
-							case '!':
-							case '?':
-							case '#':
-							case '@':
-							case '$':
-							case '%':
-							case '*':
-							case '(':
-							case ')':
-							case '/':
-							case '=':
-							case '+':
-							case '<':
-							case '>':
-							case ';':
-							case '"':
-							case '\'':
-								validkey = true;
-							default:
-								if (temp < 28 && (validkey || (lastkey_char >= 'A' && lastkey_char <= 'Z') || (lastkey_char >= '0' && lastkey_char <= '9')))
-								{
-									stemp[temp] = lastkey_char;
-									temp++;
-								}
-								break;
-							case SDLK_BACKSPACE:
-							case SDLK_DELETE:
+							case SDL_SCANCODE_BACKSPACE:
+							case SDL_SCANCODE_DELETE:
 								if (temp)
 								{
 									temp--;
 									stemp[temp] = ' ';
 								}
 								break;
-							case SDLK_ESCAPE:
+							case SDL_SCANCODE_ESCAPE:
 								quit = true;
 								cancel = true;
 								break;
-							case SDLK_RETURN:
+							case SDL_SCANCODE_RETURN:
 								quit = true;
+								break;
+							default:
 								break;
 						}
 					}
 				}
 				while (!quit);
-#endif
 
 				if (!cancel)
 				{
@@ -1684,7 +2175,7 @@ void JE_highScoreCheck( void )
 				{
 					if (i != slot)
 					{
-						sprintf(buffer, "~#%d:~  %d", (i - first_slot + 1), saveFiles[i].highScore1);
+						sprintf(buffer, "~#%d:~  %ld", (i - first_slot + 1), saveFiles[i].highScore1);
 						JE_textShade(VGAScreen,  20, ((i - first_slot + 1) * 12) + 65, buffer, 15, 0, FULL_SHADE);
 						JE_textShade(VGAScreen, 150, ((i - first_slot + 1) * 12) + 65, saveFiles[i].highScoreName, 15, 2, FULL_SHADE);
 					}
@@ -1694,7 +2185,7 @@ void JE_highScoreCheck( void )
 
 				fade_palette(colors, 15, 0, 255);
 
-				sprintf(buffer, "~#%d:~  %d", (slot - first_slot + 1), saveFiles[slot].highScore1);
+				sprintf(buffer, "~#%d:~  %ld", (slot - first_slot + 1), saveFiles[slot].highScore1);
 
 				frameCountMax = 6;
 				textGlowFont = TINY_FONT;
@@ -1745,44 +2236,44 @@ void adjust_difficulty( void )
 	if (twoPlayerMode)
 	{
 		if (adjusted_score < 10000)
-			new_difficulty = 1;  // Easy
+			new_difficulty = DIFFICULTY_EASY;
 		else if (adjusted_score < 20000)
-			new_difficulty = 2;  // Normal
+			new_difficulty = DIFFICULTY_NORMAL;
 		else if (adjusted_score < 50000)
-			new_difficulty = 3;  // Hard
+			new_difficulty = DIFFICULTY_HARD;
 		else if (adjusted_score < 80000)
-			new_difficulty = 4;  // Impossible
+			new_difficulty = DIFFICULTY_IMPOSSIBLE;
 		else if (adjusted_score < 125000)
-			new_difficulty = 5;  // Insanity
+			new_difficulty = DIFFICULTY_INSANITY;
 		else if (adjusted_score < 200000)
-			new_difficulty = 6;  // Suicide
+			new_difficulty = DIFFICULTY_SUICIDE;
 		else if (adjusted_score < 400000)
-			new_difficulty = 7;  // Maniacal
+			new_difficulty = DIFFICULTY_MANIACAL;
 		else if (adjusted_score < 600000)
-			new_difficulty = 8;  // Zinglon
+			new_difficulty = DIFFICULTY_ZINGLON;
 		else
-			new_difficulty = 9;  // Nortaneous
+			new_difficulty = DIFFICULTY_NORTANEOUS;
 	}
 	else
 	{
 		if (adjusted_score < 40000)
-			new_difficulty = 1;  // Easy
+			new_difficulty = DIFFICULTY_EASY;
 		else if (adjusted_score < 70000)
-			new_difficulty = 2;  // Normal
+			new_difficulty = DIFFICULTY_NORMAL;
 		else if (adjusted_score < 150000)
-			new_difficulty = 3;  // Hard
+			new_difficulty = DIFFICULTY_HARD;
 		else if (adjusted_score < 300000)
-			new_difficulty = 4;  // Impossible
+			new_difficulty = DIFFICULTY_IMPOSSIBLE;
 		else if (adjusted_score < 600000)
-			new_difficulty = 5;  // Insanity
+			new_difficulty = DIFFICULTY_INSANITY;
 		else if (adjusted_score < 1000000)
-			new_difficulty = 6;  // Suicide
+			new_difficulty = DIFFICULTY_SUICIDE;
 		else if (adjusted_score < 2000000)
-			new_difficulty = 7;  // Maniacal
+			new_difficulty = DIFFICULTY_MANIACAL;
 		else if (adjusted_score < 3000000)
-			new_difficulty = 8;  // Zinglon
+			new_difficulty = DIFFICULTY_ZINGLON;
 		else
-			new_difficulty = 9;  // Nortaneous
+			new_difficulty = DIFFICULTY_NORTANEOUS;
 	}
 
 	difficultyLevel = MAX((unsigned)difficultyLevel, new_difficulty);
@@ -1797,39 +2288,47 @@ bool load_next_demo( void )
 	snprintf(demo_filename, sizeof(demo_filename), "demo.%d", demo_num);
 	demo_file = dir_fopen_die(data_dir(), demo_filename, "rb"); // TODO: only play demos from existing file (instead of dying)
 
-	difficultyLevel = 2;
+	difficultyLevel = DIFFICULTY_NORMAL;
 	bonusLevelCurrent = false;
 
-	Uint8 temp = fgetc(demo_file);
+	Uint8 temp;
+	fread_u8_die(&temp, 1, demo_file);
 	JE_initEpisode(temp);
-	efread(levelName, 1, 10, demo_file); levelName[10] = '\0';
-	lvlFileNum = fgetc(demo_file);
 
-	player[0].items.weapon[FRONT_WEAPON].id  = fgetc(demo_file);
-	player[0].items.weapon[REAR_WEAPON].id   = fgetc(demo_file);
-	player[0].items.super_arcade_mode        = fgetc(demo_file);
-	player[0].items.sidekick[LEFT_SIDEKICK]  = fgetc(demo_file);
-	player[0].items.sidekick[RIGHT_SIDEKICK] = fgetc(demo_file);
-	player[0].items.generator                = fgetc(demo_file);
+	fread_die(levelName, 1, 10, demo_file);
+	levelName[10] = '\0';
 
-	player[0].items.sidekick_level           = fgetc(demo_file); // could probably ignore
-	player[0].items.sidekick_series          = fgetc(demo_file); // could probably ignore
+	fread_u8_die(&lvlFileNum, 1, demo_file);
 
-	initial_episode_num                      = fgetc(demo_file); // could probably ignore
+	fread_u8_die(&player[0].items.weapon[FRONT_WEAPON].id,  1, demo_file);
+	fread_u8_die(&player[0].items.weapon[REAR_WEAPON].id,   1, demo_file);
+	fread_u8_die(&player[0].items.super_arcade_mode,        1, demo_file);
+	fread_u8_die(&player[0].items.sidekick[LEFT_SIDEKICK],  1, demo_file);
+	fread_u8_die(&player[0].items.sidekick[RIGHT_SIDEKICK], 1, demo_file);
+	fread_u8_die(&player[0].items.generator,                1, demo_file);
 
-	player[0].items.shield                   = fgetc(demo_file);
-	player[0].items.special                  = fgetc(demo_file);
-	player[0].items.ship                     = fgetc(demo_file);
+	fread_u8_die(&player[0].items.sidekick_level,           1, demo_file); // could probably ignore
+	fread_u8_die(&player[0].items.sidekick_series,          1, demo_file); // could probably ignore
+
+	fread_u8_die(&initial_episode_num,                      1, demo_file); // could probably ignore
+
+	fread_u8_die(&player[0].items.shield,                   1, demo_file);
+	fread_u8_die(&player[0].items.special,                  1, demo_file);
+	fread_u8_die(&player[0].items.ship,                     1, demo_file);
 
 	for (uint i = 0; i < 2; ++i)
-		player[0].items.weapon[i].power = fgetc(demo_file);
+		fread_u8_die(&player[0].items.weapon[i].power,      1, demo_file);
 
-	fseek(demo_file, 3, SEEK_CUR);
+	Uint8 unused[3];
+	fread_u8_die(unused, 3, demo_file);
 
-	levelSong = fgetc(demo_file);
+	fread_u8_die(&levelSong, 1, demo_file);
 
-	demo_keys_wait = 0;
-	demo_keys = next_demo_keys = 0;
+	demo_keys = 0;
+
+	Uint8 temp2[2] = { 0, 0 };
+	fread_u8(temp2, 2, demo_file);
+	demo_keys_wait = (temp2[0] << 8) | temp2[1];
 
 	printf("loaded demo '%s'\n", demo_filename);
 
@@ -1838,12 +2337,23 @@ bool load_next_demo( void )
 
 bool replay_demo_keys( void )
 {
-	if (demo_keys_wait == 0)
-		if (read_demo_keys() == false)
-			return false; // no more keys
+	while (demo_keys_wait == 0)
+	{
+		demo_keys = 0;
+		fread_u8(&demo_keys, 1, demo_file);
 
-	if (demo_keys_wait > 0)
-		demo_keys_wait--;
+		Uint8 temp2[2] = { 0, 0 };
+		fread_u8(temp2, 2, demo_file);
+		demo_keys_wait = (temp2[0] << 8) | temp2[1];
+
+		if (feof(demo_file))
+		{
+			// no more keys
+			return false;
+		}
+	}
+
+	demo_keys_wait--;
 
 	if (demo_keys & (1 << 0))
 		player[0].y -= CURRENT_KEY_SPEED;
@@ -1861,18 +2371,6 @@ bool replay_demo_keys( void )
 	button[2] = (bool)(demo_keys & (1 << 7));
 
 	return true;
-}
-
-bool read_demo_keys( void )
-{
-	demo_keys = next_demo_keys;
-
-	efread(&demo_keys_wait, sizeof(Uint16), 1, demo_file);
-	demo_keys_wait = SDL_Swap16(demo_keys_wait);
-
-	next_demo_keys = getc(demo_file);
-
-	return !feof(demo_file);
 }
 
 /*Street Fighter codes*/
@@ -1912,7 +2410,7 @@ void JE_SFCodes( JE_byte playerNum_, JE_integer PX_, JE_integer PY_, JE_integer 
 			}
 		}
 
-		if (temp2 == 1) // if exactly one direction pressed or firebutton is released
+		if (temp2 == 1) // if exactly one direction pressed or fire button is released
 		{
 			temp += button[0] * 4;
 
@@ -1991,13 +2489,13 @@ void JE_sort( void )
 
 void JE_playCredits( void )
 {
-	enum { lines_max = 132 };
+	enum { lines_max = 131 };
 	enum { line_max_length = 65 };
-	
+
 	char credstr[lines_max][line_max_length + 1];
-	
+
 	int lines = 0;
-	
+
 	JE_byte currentpic = 0, fade = 0;
 	JE_shortint fadechg = 1;
 	JE_byte currentship = 0;
@@ -2009,32 +2507,30 @@ void JE_playCredits( void )
 	setjasondelay2(1000);
 
 	play_song(8);
-	
+
 	// load credits text
 	FILE *f = dir_fopen_die(data_dir(), "tyrian.cdt", "rb");
-	for (lines = 0; !feof(f) && lines < lines_max; ++lines)
+	for (lines = 0; lines < lines_max; ++lines)
 	{
 		read_encrypted_pascal_string(credstr[lines], sizeof(credstr[lines]), f);
 	}
-	if (lines == lines_max)
-		--lines;
 	fclose(f);
-	
+
 	memcpy(colors, palettes[6-1], sizeof(colors));
 	JE_clr256(VGAScreen);
 	JE_showVGA();
 	fade_palette(colors, 2, 0, 255);
-	
+
 	//tempScreenSeg = VGAScreenSeg;
-	
+
 	const int ticks_max = lines * 20 * 3;
 	for (int ticks = 0; ticks < ticks_max; ++ticks)
 	{
 		setjasondelay(1);
 		JE_clr256(VGAScreen);
-		
+
 		blit_sprite_hv(VGAScreenSeg, 319 - sprite(EXTRA_SHAPES, currentpic)->width, 100 - (sprite(EXTRA_SHAPES, currentpic)->height / 2), EXTRA_SHAPES, currentpic, 0x0, fade - 15);
-		
+
 		fade += fadechg;
 		if (fade == 0 && fadechg == -1)
 		{
@@ -2098,18 +2594,18 @@ void JE_playCredits( void )
 			if (shipxca > 0 && shipxc > 0)
 				shipxwait = 1;
 		}
-		
+
 		uint ship_sprite = ships[currentship].shipgraphic;
 		if (shipxc < -10)
 			ship_sprite -= (shipxc < -20) ? 4 : 2;
 		else if (shipxc > 10)
 			ship_sprite += (shipxc > 20) ? 4 : 2;
-		
-		blit_sprite2x2(VGAScreen, shipx / 40, 184 - (ticks % 200), shapes9, ship_sprite);
-		
+
+		blit_sprite2x2(VGAScreen, shipx / 40, 184 - (ticks % 200), spriteSheet9, ship_sprite);
+
 		const int bottom_line = (ticks / 3) / 20;
 		int y = 20 - ((ticks / 3) % 20);
-		
+
 		for (int line = bottom_line - 10; line < bottom_line; ++line)
 		{
 			if (line >= 0 && line < lines_max)
@@ -2118,44 +2614,44 @@ void JE_playCredits( void )
 				{
 					const Uint8 color = credstr[line][0] - 65;
 					const char *text = &credstr[line][1];
-					
+
 					const int x = 110 - JE_textWidth(text, SMALL_FONT_SHAPES) / 2;
-					
+
 					JE_outTextAdjust(VGAScreen, x + abs((y / 18) % 4 - 2) - 1, y - 1, text, color, -8, SMALL_FONT_SHAPES, false);
 					JE_outTextAdjust(VGAScreen, x,                             y,     text, color, -2, SMALL_FONT_SHAPES, false);
 				}
 			}
-			
+
 			y += 20;
 		}
-		
+
 		fill_rectangle_xy(VGAScreen, 0,  0, 319, 10, 0);
 		fill_rectangle_xy(VGAScreen, 0, 190, 319, 199, 0);
-		
+
 		if (currentpic == sprite_table[EXTRA_SHAPES].count - 1)
 			JE_outTextAdjust(VGAScreen, 5, 180, miscText[54], 2, -2, SMALL_FONT_SHAPES, false);  // levels-in-episode
-		
+
 		if (bottom_line == lines_max - 8)
 			fade_song();
-		
+
 		if (ticks == ticks_max - 1)
 		{
 			--ticks;
 			play_song(9);
 		}
-		
+
 		NETWORK_KEEP_ALIVE();
-		
+
 		JE_showVGA();
-		
+
 		wait_delay();
-		
+
 		if (JE_anyButton())
 			break;
 	}
-	
+
 	fade_black(10);
-	
+
 	free_sprites(EXTRA_SHAPES);
 }
 
@@ -2256,7 +2752,7 @@ void JE_endLevelAni( void )
 			{
 				NETWORK_KEEP_ALIVE();
 
-				JE_playSampleNum(18);
+				JE_playSampleNum(S_ITEM);
 				x = 20 + 30 * temp;
 				y = 135;
 				JE_drawCube(VGAScreenSeg, x, y, 9, 0);
@@ -2388,15 +2884,6 @@ void JE_operation( JE_byte slot )
 
 		JE_barShade(VGAScreen, 65, 55, 255, 155);
 
-#ifdef VITA
-		char *str = keyboard_vita_get("Enter a name", 20);
-		if(str != NULL) {
-			JE_saveGame(slot, str);
-			JE_playSampleNum(S_SELECT);
-		} else {
-			JE_playSampleNum(S_SPRING);
-		}
-#else
 		bool quit = false;
 		while (!quit)
 		{
@@ -2419,77 +2906,63 @@ void JE_operation( JE_byte slot )
 				JE_barShade(VGAScreen, tempW + 2, 90, tempW + 6, 95);
 				fill_rectangle_xy(VGAScreen, tempW + 1, 89, tempW + 5, 94, flash);
 
+				int text_x = 54 + 45 - (JE_textWidth(miscText[9], FONT_SHAPES) / 2);
+				JE_outTextAdjust(VGAScreen, text_x, 128, miscText[9], 15, -5, FONT_SHAPES, true);
+
+				text_x = 149 + 45 - (JE_textWidth(miscText[10], FONT_SHAPES) / 2);
+				JE_outTextAdjust(VGAScreen, text_x, 128, miscText[10], 15, -5, FONT_SHAPES, true);
+
 				for (int i = 0; i < 14; i++)
 				{
 					setjasondelay(1);
+
+					push_joysticks_as_keyboard();
+					service_wait_delay();
 
 					JE_mouseStart();
 					JE_showVGA();
 					JE_mouseReplace();
 
-					push_joysticks_as_keyboard();
-					service_wait_delay();
-
-					if (newkey || newmouse)
+					if (newkey || newmouse || new_text)
 						break;
 				}
-
 			}
-			while (!newkey && !newmouse);
+			while (!newkey && !newmouse && !new_text);
 
 			if (mouseButton > 0)
 			{
-				if (mouseX > 56 && mouseX < 142 && mouseY > 123 && mouseY < 149)
+				if (lastmouse_x > 56 && lastmouse_x < 142 && lastmouse_y > 123 && lastmouse_y < 149)
 				{
 					quit = true;
 					JE_saveGame(slot, stemp);
 					JE_playSampleNum(S_SELECT);
 				}
-				else if (mouseX > 151 && mouseX < 237 && mouseY > 123 && mouseY < 149)
+				else if (lastmouse_x > 151 && lastmouse_x < 237 && lastmouse_y > 123 && lastmouse_y < 149)
 				{
 					quit = true;
 					JE_playSampleNum(S_SPRING);
 				}
 			}
+			else if (new_text)
+			{
+				for (size_t ti = 0U; last_text[ti] != '\0'; ++ti)
+				{
+					const char c = (unsigned char)last_text[ti] <= 127U ? toupper(last_text[ti]) : 0;
+					if ((c == ' ' || font_ascii[(unsigned char)c] != -1) &&
+					    temp < 14)
+					{
+						JE_playSampleNum(S_CURSOR);
+						stemp[temp] = c;
+						temp += 1;
+					}
+				}
+			}
 			else if (newkey)
 			{
-				bool validkey = false;
-				lastkey_char = toupper(lastkey_char);
-				switch (lastkey_char)
+				switch (lastkey_scan)
 				{
-					case ' ':
-					case '-':
-					case '.':
-					case ',':
-					case ':':
-					case '!':
-					case '?':
-					case '#':
-					case '@':
-					case '$':
-					case '%':
-					case '*':
-					case '(':
-					case ')':
-					case '/':
-					case '=':
-					case '+':
-					case '<':
-					case '>':
-					case ';':
-					case '"':
-					case '\'':
-						validkey = true;
-					default:
-						if (temp < 14 && (validkey || (lastkey_char >= 'A' && lastkey_char <= 'Z') || (lastkey_char >= '0' && lastkey_char <= '9')))
-						{
-							JE_playSampleNum(S_CURSOR);
-							stemp[temp] = lastkey_char;
-							temp++;
-						}
-						break;
-					case SDLK_BACKSPACE:
-					case SDLK_DELETE:
+					case SDL_SCANCODE_BACKSPACE:
+					case SDL_SCANCODE_DELETE:
 						if (temp)
 						{
 							temp--;
@@ -2497,20 +2970,20 @@ void JE_operation( JE_byte slot )
 							JE_playSampleNum(S_CLICK);
 						}
 						break;
-					case SDLK_ESCAPE:
+					case SDL_SCANCODE_ESCAPE:
 						quit = true;
 						JE_playSampleNum(S_SPRING);
 						break;
-					case SDLK_RETURN:
+					case SDL_SCANCODE_RETURN:
 						quit = true;
 						JE_saveGame(slot, stemp);
 						JE_playSampleNum(S_SELECT);
 						break;
+					default:
+						break;
 				}
-
 			}
 		}
-#endif
 	}
 
 	wait_noinput(false, true, false);
@@ -2529,7 +3002,7 @@ void JE_inGameDisplays( void )
 
 	/*Special Weapon?*/
 	if (player[0].items.special > 0)
-		blit_sprite2x2(VGAScreen, 25, 1, eShapes[5], special[player[0].items.special].itemgraphic);
+		blit_sprite2x2(VGAScreen, 25, 1, spriteSheet10, special[player[0].items.special].itemgraphic);
 
 	/*Lives Left*/
 	if (onePlayerAction || twoPlayerMode)
@@ -2543,7 +3016,7 @@ void JE_inGameDisplays( void )
 
 			if (extra_lives >= 5)
 			{
-				blit_sprite2(VGAScreen, tempW, y, shapes9, 285);
+				blit_sprite2(VGAScreen, tempW, y, spriteSheet9, 285);
 				tempW = (temp == 0) ? 45 : 250;
 				sprintf(tempstr, "%d", extra_lives);
 				JE_textShade(VGAScreen, tempW, y + 3, tempstr, 15, 1, FULL_SHADE);
@@ -2552,7 +3025,7 @@ void JE_inGameDisplays( void )
 			{
 				for (uint i = 0; i < extra_lives; ++i)
 				{
-					blit_sprite2(VGAScreen, tempW, y, shapes9, 285);
+					blit_sprite2(VGAScreen, tempW, y, spriteSheet9, 285);
 
 					tempW += (temp == 0) ? 12 : -12;
 				}
@@ -2576,7 +3049,7 @@ void JE_inGameDisplays( void )
 
 		for (uint j = player[i].superbombs; j > 0; --j)
 		{
-			blit_sprite2(VGAScreen, x, 160, shapes9, 304);
+			blit_sprite2(VGAScreen, x, 160, spriteSheet9, 304);
 			x += (i == 0) ? 12 : -12;
 		}
 	}
@@ -2839,6 +3312,8 @@ void JE_mainKeyboardInput( void )
 
 void JE_pauseGame( void )
 {
+	mouseSetRelative(false);
+
 	JE_boolean done = false;
 	JE_word mouseX, mouseY;
 
@@ -2932,13 +3407,15 @@ void JE_pauseGame( void )
 	set_volume(tyrMusicVolume, fxVolume);
 
 	//skipStarShowVGA = true;
+
+	mouseSetRelative(true);
 }
 
 void JE_playerMovement( Player *this_player,
                         JE_byte inputDevice,
                         JE_byte playerNum_,
                         JE_word shipGr_,
-                        Sprite2_array *shapes9ptr_,
+                        Sprite2_array *shipGrPtr_,
                         JE_word *mouseX_, JE_word *mouseY_ )
 {
 	JE_integer mouseXC, mouseYC;
@@ -3158,36 +3635,30 @@ redo:
 					button[1] |= mouse_pressed[1];
 					button[2] |= mouse_has_three_buttons ? mouse_pressed[2] : mouse_pressed[1];
 
-					if (input_grab_enabled)
-					{
-						mouseXC += mouse_x - 159;
-						mouseYC += mouse_y - 100;
-					}
-
-					if ((!isNetworkGame || playerNum_ == thisPlayerNum)
-					    && (!galagaMode || (playerNum_ == 2 || !twoPlayerMode || player[1].exploding_ticks > 0)))
-					{
-						set_mouse_position(159, 100);
-					}
+					Sint32 mouseXR;
+					Sint32 mouseYR;
+					mouseGetRelativePosition(&mouseXR, &mouseYR);
+					mouseXC += mouseXR;
+					mouseYC += mouseYR;
 				}
 
 				/* keyboard input */
 				if ((inputDevice == 0 || inputDevice == 1) && !play_demo)
 				{
-					if (keysactive[keySettings[0]])
+					if (keysactive[keySettings[KEY_SETTING_UP]])
 						this_player->y -= CURRENT_KEY_SPEED;
-					if (keysactive[keySettings[1]])
+					if (keysactive[keySettings[KEY_SETTING_DOWN]])
 						this_player->y += CURRENT_KEY_SPEED;
 
-					if (keysactive[keySettings[2]])
+					if (keysactive[keySettings[KEY_SETTING_LEFT]])
 						this_player->x -= CURRENT_KEY_SPEED;
-					if (keysactive[keySettings[3]])
+					if (keysactive[keySettings[KEY_SETTING_RIGHT]])
 						this_player->x += CURRENT_KEY_SPEED;
 
-					button[0] = button[0] || keysactive[keySettings[4]];
-					button[3] = button[3] || keysactive[keySettings[5]];
-					button[1] = button[1] || keysactive[keySettings[6]];
-					button[2] = button[2] || keysactive[keySettings[7]];
+					button[0] = button[0] || keysactive[keySettings[KEY_SETTING_FIRE]];
+					button[3] = button[3] || keysactive[keySettings[KEY_SETTING_CHANGE_FIRE]];
+					button[1] = button[1] || keysactive[keySettings[KEY_SETTING_LEFT_SIDEKICK]];
+					button[2] = button[2] || keysactive[keySettings[KEY_SETTING_RIGHT_SIDEKICK]];
 
 					if (constantPlay)
 					{
@@ -3214,14 +3685,14 @@ redo:
 
 						if (new_input)
 						{
-							demo_keys_wait = SDL_Swap16(demo_keys_wait);
-							efwrite(&demo_keys_wait, sizeof(Uint16), 1, demo_file);
+							Uint8 temp2[2] = { demo_keys_wait >> 8, demo_keys_wait };
+							fwrite_u8(temp2, 2, demo_file);
 
 							demo_keys = 0;
 							for (unsigned int i = 0; i < 8; i++)
 								demo_keys |= keysactive[keySettings[i]] ? (1 << i) : 0;
 
-							fputc(demo_keys, demo_file);
+							fwrite_u8(&demo_keys, 1, demo_file);
 
 							demo_keys_wait = 0;
 						}
@@ -3434,17 +3905,17 @@ redo:
 				{
 					if (shipGr_ == 0)
 					{
-						blit_sprite2x2(VGAScreen, this_player->x - 17, trail_y - 7, *shapes9ptr_, 13);
-						blit_sprite2x2(VGAScreen, this_player->x + 7 , trail_y - 7, *shapes9ptr_, 51);
+						blit_sprite2x2(VGAScreen, this_player->x - 17, trail_y - 7, *shipGrPtr_, 13);
+						blit_sprite2x2(VGAScreen, this_player->x + 7 , trail_y - 7, *shipGrPtr_, 51);
 					}
 					else if (shipGr_ == 1)
 					{
-						blit_sprite2x2(VGAScreen, this_player->x - 17, trail_y - 7, *shapes9ptr_, 220);
-						blit_sprite2x2(VGAScreen, this_player->x + 7 , trail_y - 7, *shapes9ptr_, 222);
+						blit_sprite2x2(VGAScreen, this_player->x - 17, trail_y - 7, *shipGrPtr_, 220);
+						blit_sprite2x2(VGAScreen, this_player->x + 7 , trail_y - 7, *shipGrPtr_, 222);
 					}
 					else
 					{
-						blit_sprite2x2(VGAScreen, this_player->x - 5, trail_y - 7, *shapes9ptr_, shipGr_);
+						blit_sprite2x2(VGAScreen, this_player->x - 5, trail_y - 7, *shipGrPtr_, shipGr_);
 					}
 				}
 			}
@@ -3600,12 +4071,12 @@ redo:
 		{
 			if (background2)
 			{
-				blit_sprite2x2_darken(VGAScreen, this_player->x - 17 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite + 13);
-				blit_sprite2x2_darken(VGAScreen, this_player->x + 7 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite + 51);
+				blit_sprite2x2_darken(VGAScreen, this_player->x - 17 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite + 13);
+				blit_sprite2x2_darken(VGAScreen, this_player->x + 7 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite + 51);
 				if (superWild)
 				{
-					blit_sprite2x2_darken(VGAScreen, this_player->x - 16 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite + 13);
-					blit_sprite2x2_darken(VGAScreen, this_player->x + 6 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite + 51);
+					blit_sprite2x2_darken(VGAScreen, this_player->x - 16 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite + 13);
+					blit_sprite2x2_darken(VGAScreen, this_player->x + 6 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite + 51);
 				}
 			}
 		}
@@ -3613,18 +4084,18 @@ redo:
 		{
 			if (background2)
 			{
-				blit_sprite2x2_darken(VGAScreen, this_player->x - 17 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, 220);
-				blit_sprite2x2_darken(VGAScreen, this_player->x + 7 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, 222);
+				blit_sprite2x2_darken(VGAScreen, this_player->x - 17 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, 220);
+				blit_sprite2x2_darken(VGAScreen, this_player->x + 7 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, 222);
 			}
 		}
 		else
 		{
 			if (background2)
 			{
-				blit_sprite2x2_darken(VGAScreen, this_player->x - 5 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite);
+				blit_sprite2x2_darken(VGAScreen, this_player->x - 5 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite);
 				if (superWild)
 				{
-					blit_sprite2x2_darken(VGAScreen, this_player->x - 4 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shapes9ptr_, ship_sprite);
+					blit_sprite2x2_darken(VGAScreen, this_player->x - 4 - mapX2Ofs + 30, this_player->y - 7 + shadowYDist, *shipGrPtr_, ship_sprite);
 				}
 			}
 		}
@@ -3635,39 +4106,39 @@ redo:
 
 			if (shipGr_ == 0)
 			{
-				blit_sprite2x2_blend(VGAScreen, this_player->x - 17, this_player->y - 7, *shapes9ptr_, ship_sprite + 13);
-				blit_sprite2x2_blend(VGAScreen, this_player->x + 7 , this_player->y - 7, *shapes9ptr_, ship_sprite + 51);
+				blit_sprite2x2_blend(VGAScreen, this_player->x - 17, this_player->y - 7, *shipGrPtr_, ship_sprite + 13);
+				blit_sprite2x2_blend(VGAScreen, this_player->x + 7 , this_player->y - 7, *shipGrPtr_, ship_sprite + 51);
 			}
 			else if (shipGr_ == 1)
 			{
-				blit_sprite2x2_blend(VGAScreen, this_player->x - 17, this_player->y - 7, *shapes9ptr_, 220);
-				blit_sprite2x2_blend(VGAScreen, this_player->x + 7 , this_player->y - 7, *shapes9ptr_, 222);
+				blit_sprite2x2_blend(VGAScreen, this_player->x - 17, this_player->y - 7, *shipGrPtr_, 220);
+				blit_sprite2x2_blend(VGAScreen, this_player->x + 7 , this_player->y - 7, *shipGrPtr_, 222);
 			}
 			else
-				blit_sprite2x2_blend(VGAScreen, this_player->x - 5, this_player->y - 7, *shapes9ptr_, ship_sprite);
+				blit_sprite2x2_blend(VGAScreen, this_player->x - 5, this_player->y - 7, *shipGrPtr_, ship_sprite);
 		}
 		else
 		{
 			if (shipGr_ == 0)
 			{
-				blit_sprite2x2(VGAScreen, this_player->x - 17, this_player->y - 7, *shapes9ptr_, ship_sprite + 13);
-				blit_sprite2x2(VGAScreen, this_player->x + 7, this_player->y - 7, *shapes9ptr_, ship_sprite + 51);
+				blit_sprite2x2(VGAScreen, this_player->x - 17, this_player->y - 7, *shipGrPtr_, ship_sprite + 13);
+				blit_sprite2x2(VGAScreen, this_player->x + 7, this_player->y - 7, *shipGrPtr_, ship_sprite + 51);
 			}
 			else if (shipGr_ == 1)
 			{
-				blit_sprite2x2(VGAScreen, this_player->x - 17, this_player->y - 7, *shapes9ptr_, 220);
-				blit_sprite2x2(VGAScreen, this_player->x + 7, this_player->y - 7, *shapes9ptr_, 222);
+				blit_sprite2x2(VGAScreen, this_player->x - 17, this_player->y - 7, *shipGrPtr_, 220);
+				blit_sprite2x2(VGAScreen, this_player->x + 7, this_player->y - 7, *shipGrPtr_, 222);
 
 				int ship_banking = 0;
 				switch (ship_sprite)
 				{
 				case 5:
-					blit_sprite2(VGAScreen, this_player->x - 17, this_player->y + 7, *shapes9ptr_, 40);
+					blit_sprite2(VGAScreen, this_player->x - 17, this_player->y + 7, *shipGrPtr_, 40);
 					tempW = this_player->x - 7;
 					ship_banking = -2;
 					break;
 				case 3:
-					blit_sprite2(VGAScreen, this_player->x - 17, this_player->y + 7, *shapes9ptr_, 39);
+					blit_sprite2(VGAScreen, this_player->x - 17, this_player->y + 7, *shipGrPtr_, 39);
 					tempW = this_player->x - 7;
 					ship_banking = -1;
 					break;
@@ -3675,12 +4146,12 @@ redo:
 					ship_banking = 0;
 					break;
 				case -1:
-					blit_sprite2(VGAScreen, this_player->x + 19, this_player->y + 7, *shapes9ptr_, 58);
+					blit_sprite2(VGAScreen, this_player->x + 19, this_player->y + 7, *shipGrPtr_, 58);
 					tempW = this_player->x + 9;
 					ship_banking = 1;
 					break;
 				case -3:
-					blit_sprite2(VGAScreen, this_player->x + 19, this_player->y + 7, *shapes9ptr_, 59);
+					blit_sprite2(VGAScreen, this_player->x + 19, this_player->y + 7, *shipGrPtr_, 59);
 					tempW = this_player->x + 9;
 					ship_banking = 2;
 					break;
@@ -3700,7 +4171,7 @@ redo:
 			}
 			else
 			{
-				blit_sprite2x2(VGAScreen, this_player->x - 5, this_player->y - 7, *shapes9ptr_, ship_sprite);
+				blit_sprite2x2(VGAScreen, this_player->x - 5, this_player->y - 7, *shipGrPtr_, ship_sprite);
 			}
 		}
 
@@ -3803,7 +4274,7 @@ redo:
 				{
 
 					if (!twoPlayerLinked)
-						blit_sprite2(VGAScreen, this_player->x + (shipGr_ == 0) + 1, this_player->y - 13, eShapes[5], 77 + chargeLevel + chargeGr * 19);
+						blit_sprite2(VGAScreen, this_player->x + (shipGr_ == 0) + 1, this_player->y - 13, spriteSheet10, 77 + chargeLevel + chargeGr * 19);
 
 					if (chargeGrWait > 0)
 					{
@@ -3832,7 +4303,7 @@ redo:
 							chargeLevel++;
 
 						chargeWait = 28 - this_player->items.weapon[REAR_WEAPON].power * 2;
-						if (difficultyLevel > 3)
+						if (difficultyLevel > DIFFICULTY_HARD)
 							chargeWait -= 5;
 					}
 
@@ -3893,7 +4364,7 @@ redo:
 					this_player->sidekick[LEFT_SIDEKICK].x = this_player->x;
 					this_player->sidekick[LEFT_SIDEKICK].y = MAX(10, this_player->y - 20);
 					break;
-				case 4:  // orbitting
+				case 4:  // orbiting
 					this_player->sidekick[LEFT_SIDEKICK].x = this_player->x + roundf(sinf(optionSatelliteRotate) * 20);
 					this_player->sidekick[LEFT_SIDEKICK].y = this_player->y + roundf(cosf(optionSatelliteRotate) * 20);
 					break;
@@ -3901,7 +4372,7 @@ redo:
 
 				switch (this_player->sidekick[RIGHT_SIDEKICK].style)
 				{
-				case 4:  // orbitting
+				case 4:  // orbiting
 					this_player->sidekick[RIGHT_SIDEKICK].x = this_player->x - roundf(sinf(optionSatelliteRotate) * 20);
 					this_player->sidekick[RIGHT_SIDEKICK].y = this_player->y - roundf(cosf(optionSatelliteRotate) * 20);
 					break;
@@ -4089,9 +4560,9 @@ redo:
 				const uint sprite = this_option->gr[this_player->sidekick[i].animation_frame] + this_player->sidekick[i].charge;
 
 				if (this_player->sidekick[i].style == 1 || this_player->sidekick[i].style == 2)
-					blit_sprite2x2(VGAScreen, x - 6, y, eShapes[5], sprite);
+					blit_sprite2x2(VGAScreen, x - 6, y, spriteSheet10, sprite);
 				else
-					blit_sprite2(VGAScreen, x, y, shapes9, sprite);
+					blit_sprite2(VGAScreen, x, y, spriteSheet9, sprite);
 			}
 
 			if (--this_player->sidekick[i].charge_ticks == 0)
@@ -4248,11 +4719,11 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 							shotRepeat[SHOT_SPECIAL2] = 0;
 
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], special[evalue - 32100].name);
 							else if (twoPlayerMode)
-								sprintf(tempStr, "%s %s", miscText[43-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s", miscText[43-1], special[evalue - 32100].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[64-1], special[evalue - 32100].name);
+								snprintf(tempStr, 256, "%s %s", miscText[64-1], special[evalue - 32100].name);
 							JE_drawTextWindow(tempStr);
 							soundQueue[7] = S_POWERUP;
 							enemyAvail[z] = 1;
@@ -4264,9 +4735,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						{
 							enemyAvail[z] = 1;
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], options[evalue - 32000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], options[evalue - 32000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[44-1], options[evalue - 32000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[44-1], options[evalue - 32000].name);
 							JE_drawTextWindow(tempStr);
 
 							// if picked up a different sidekick than player already has, then reset sidekicks to least powerful, else power them up
@@ -4293,7 +4764,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						else if (onePlayerAction)
 						{
 							enemyAvail[z] = 1;
-							sprintf(tempStr, "%s %s", miscText[64-1], options[evalue - 32000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], options[evalue - 32000].name);
 							JE_drawTextWindow(tempStr);
 
 							for (uint i = 0; i < COUNTOF(player[0].items.sidekick); ++i)
@@ -4313,9 +4784,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						if (playerNum_ == 2)
 						{
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], weaponPort[evalue - 31000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], weaponPort[evalue - 31000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[44-1], weaponPort[evalue - 31000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[44-1], weaponPort[evalue - 31000].name);
 							JE_drawTextWindow(tempStr);
 							player[1].items.weapon[REAR_WEAPON].id = evalue - 31000;
 							shotMultiPos[SHOT_REAR] = 0;
@@ -4324,7 +4795,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						}
 						else if (onePlayerAction)
 						{
-							sprintf(tempStr, "%s %s", miscText[64-1], weaponPort[evalue - 31000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], weaponPort[evalue - 31000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[REAR_WEAPON].id = evalue - 31000;
 							shotMultiPos[SHOT_REAR] = 0;
@@ -4340,9 +4811,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						if (playerNum_ == 1 && twoPlayerMode)
 						{
 							if (isNetworkGame)
-								sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], weaponPort[evalue - 30000].name);
+								snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], weaponPort[evalue - 30000].name);
 							else
-								sprintf(tempStr, "%s %s", miscText[43-1], weaponPort[evalue - 30000].name);
+								snprintf(tempStr, 256, "%s %s", miscText[43-1], weaponPort[evalue - 30000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[FRONT_WEAPON].id = evalue - 30000;
 							shotMultiPos[SHOT_FRONT] = 0;
@@ -4351,7 +4822,7 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 						}
 						else if (onePlayerAction)
 						{
-							sprintf(tempStr, "%s %s", miscText[64-1], weaponPort[evalue - 30000].name);
+							snprintf(tempStr, 256, "%s %s", miscText[64-1], weaponPort[evalue - 30000].name);
 							JE_drawTextWindow(tempStr);
 							player[0].items.weapon[FRONT_WEAPON].id = evalue - 30000;
 							shotMultiPos[SHOT_FRONT] = 0;
@@ -4421,9 +4892,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 					else if (evalue == -1)  // got front weapon powerup
 					{
 						if (isNetworkGame)
-							sprintf(tempStr, "%s %s %s", JE_getName(1), miscTextB[4-1], miscText[45-1]);
+							snprintf(tempStr, 256, "%s %s %s", JE_getName(1), miscTextB[4-1], miscText[45-1]);
 						else if (twoPlayerMode)
-							sprintf(tempStr, "%s %s", miscText[43-1], miscText[45-1]);
+							snprintf(tempStr, 256, "%s %s", miscText[43-1], miscText[45-1]);
 						else
 							strcpy(tempStr, miscText[45-1]);
 						JE_drawTextWindow(tempStr);
@@ -4434,9 +4905,9 @@ void JE_playerCollide( Player *this_player, JE_byte playerNum_ )
 					else if (evalue == -2)  // got rear weapon powerup
 					{
 						if (isNetworkGame)
-							sprintf(tempStr, "%s %s %s", JE_getName(2), miscTextB[4-1], miscText[46-1]);
+							snprintf(tempStr, 256, "%s %s %s", JE_getName(2), miscTextB[4-1], miscText[46-1]);
 						else if (twoPlayerMode)
-							sprintf(tempStr, "%s %s", miscText[44-1], miscText[46-1]);
+							snprintf(tempStr, 256, "%s %s", miscText[44-1], miscText[46-1]);
 						else
 							strcpy(tempStr, miscText[46-1]);
 						JE_drawTextWindow(tempStr);

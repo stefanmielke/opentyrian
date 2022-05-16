@@ -21,6 +21,7 @@
 #define FONT_H
 
 #include <SDL.h>
+
 #include <stdbool.h>
 
 typedef enum { large_font = 0, normal_font = 1, small_font = 2 } Font;
