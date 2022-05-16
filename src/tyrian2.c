@@ -3113,7 +3113,9 @@ bool titleScreen(void) {
       if (lastmouse_but == SDL_BUTTON_RIGHT) {
         JE_playSampleNum(S_SPRING);
 
+#ifndef N64
         done = true;
+#endif
       }
     } else if (newkey) {
       switch (lastkey_scan) {
@@ -3137,9 +3139,11 @@ bool titleScreen(void) {
         break;
       }
       case SDL_SCANCODE_ESCAPE: {
+#ifndef N64
         JE_playSampleNum(S_SPRING);
 
         done = true;
+#endif
       }
       default:
         break;
@@ -3239,9 +3243,11 @@ bool titleScreen(void) {
         return true;
       }
       case MENU_ITEM_QUIT: {
+#ifndef N64
         fade_black(15);
 
         return false;
+#endif
       }
       default:
         break;
