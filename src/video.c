@@ -37,7 +37,7 @@ const char *const scaling_mode_names[ScalingMode_MAX] = {
 };
 
 int fullscreen_display;
-ScalingMode scaling_mode = SCALE_INTEGER;
+ScalingMode scaling_mode = SCALE_ASPECT_4_3;
 static SDL_Rect last_output_rect = { 0, 0, vga_width, vga_height };
 
 SDL_Surface *VGAScreen, *VGAScreenSeg;
@@ -58,7 +58,7 @@ static void deinit_texture( void );
 
 static int window_get_display_index( void );
 static void window_center_in_display( int display_index );
-static void calc_dst_render_rect( SDL_Surface *src_surface, SDL_Rect *dst_rect );
+ void calc_dst_render_rect( SDL_Surface *src_surface, SDL_Rect *dst_rect );
 static void scale_and_flip( SDL_Surface * );
 
 void init_video( void )
@@ -151,6 +151,7 @@ static void init_texture( void )
 
 	main_window_tex_format = SDL_AllocFormat(format);
 
+  fprintf(stderr, "texture %dx%d\n", scaler_w, scaler_h);
 	main_window_texture = SDL_CreateTexture(main_window_renderer, format, SDL_TEXTUREACCESS_STREAMING, scaler_w, scaler_h);
 
 	if (main_window_texture == NULL)
@@ -313,7 +314,7 @@ void JE_showVGA( void )
 	scale_and_flip(VGAScreen); 
 }
 
-static void calc_dst_render_rect( SDL_Surface *const src_surface, SDL_Rect *const dst_rect )
+ void calc_dst_render_rect( SDL_Surface *const src_surface, SDL_Rect *const dst_rect )
 {
 	// Decides how the logical output texture (after software scaling applied) will fit
 	// in the window.
@@ -384,12 +385,12 @@ static void scale_and_flip( SDL_Surface *src_surface )
 	assert(scaler_function != NULL);
 	scaler_function(src_surface, main_window_texture);
 
-	SDL_Rect dst_rect;
+	SDL_Rect dst_rect;// = { 0, 0, 320, 200 };
 	calc_dst_render_rect(src_surface, &dst_rect);
 
 	// Clear the window and blit the output texture to it
-	SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
-	SDL_RenderClear(main_window_renderer);
+	// SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
+	// SDL_RenderClear(main_window_renderer);
 	SDL_RenderCopy(main_window_renderer, main_window_texture, NULL, &dst_rect);
 	SDL_RenderPresent(main_window_renderer);
 

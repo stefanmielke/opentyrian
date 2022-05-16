@@ -29,6 +29,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef TYRIAN_DIR
+#define TYRIAN_DIR NULL
+#endif
+
 const char *custom_data_dir = NULL;
 
 // finds the Tyrian data directory

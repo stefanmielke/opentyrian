@@ -250,7 +250,7 @@ bool load_opentyrian_config( void )
 {
 	// defaults
 	fullscreen_display = -1;
-	set_scaler_by_name("Scale2x");
+	set_scaler_by_name("None");
 	memcpy(keySettings, defaultKeySettings, sizeof(keySettings));
 	
 	Config *config = &opentyrian_config;
@@ -773,7 +773,7 @@ const char *get_user_directory( void )
 			}
 		}
 #elif defined(N64)
-		strcpy(user_dir, "rom://");
+		strcpy(user_dir, "sd://data/tyrian21");
 #else
 		strcpy(user_dir, ".");
 #endif

@@ -1,7 +1,7 @@
 V=1
 SOURCE_DIR=src
 BUILD_DIR=build_n64
-DFS_LOCATION=2M
+N64_DFS_OFFSET=2M
 include $(N64_INST)/include/n64.mk
 include Makefile_sdl2.mk
 

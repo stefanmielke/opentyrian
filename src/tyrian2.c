@@ -85,66 +85,28 @@ char tempStr[31];
 JE_byte itemAvail[9][10]; /* [1..9, 1..10] */
 JE_byte itemAvailMax[9];  /* [1..9] */
 
-void JE_starShowVGA(void) {
-  JE_byte *src;
-  Uint8 *s = NULL; /* screen pointer, 8-bit specific */
-
-  int x, y, lightx, lighty, lightdist;
-
-  if (!playerEndLevel && !skipStarShowVGA) {
-
-    s = VGAScreenSeg->pixels;
-
-    src = game_screen->pixels;
-    src += 24;
-
-    if (smoothScroll != 0 /*&& thisPlayerNum != 2*/) {
+void JE_starShowVGA(void)
+{  
+  if (!playerEndLevel && !skipStarShowVGA)
+  {
+    if (smoothScroll != 0 /*&& thisPlayerNum != 2*/)
+    {
       wait_delay();
       setjasondelay(frameCountMax);
     }
 
-    if (starShowVGASpecialCode == 1) {
-      src += game_screen->pitch * 183;
-      for (y = 0; y < 184; y++) {
-        memmove(s, src, 264);
-        s += VGAScreenSeg->pitch;
-        src -= game_screen->pitch;
-      }
-    } else if (starShowVGASpecialCode == 2 && processorType >= 2) {
-      lighty = 172 - player[0].y;
-      lightx = 281 - player[0].x;
+    Uint8 *s = VGAScreenSeg->pixels;
 
-      for (y = 184; y; y--) {
-        if (lighty > y) {
-          for (x = 320 - 56; x; x--) {
-            *s = (*src & 0xf0) | ((*src >> 2) & 0x03);
-            s++;
-            src++;
-          }
-        } else {
-          for (x = 320 - 56; x; x--) {
-            lightdist = abs(lightx - x) + lighty;
-            if (lightdist < y)
-              *s = *src;
-            else if (lightdist - y <= 5)
-              *s = (*src & 0xf0) |
-                   (((*src & 0x0f) + (3 * (5 - (lightdist - y)))) / 4);
-            else
-              *s = (*src & 0xf0) | ((*src & 0x0f) >> 2);
-            s++;
-            src++;
-          }
-        }
-        s += 56 + VGAScreenSeg->pitch - 320;
-        src += 56 + VGAScreenSeg->pitch - 320;
-      }
-    } else {
-      for (y = 0; y < 184; y++) {
-        memmove(s, src, 264);
-        s += VGAScreenSeg->pitch;
-        src += game_screen->pitch;
-      }
+    JE_byte *src = game_screen->pixels;
+    src += 24;
+
+    for (int y = 0; y < 184; y++)
+    {
+      memcpy(s, src, 264);
+      s += VGAScreenSeg->pitch;
+      src += game_screen->pitch;
     }
+    
     JE_showVGA();
   }
 
