@@ -387,7 +387,7 @@ static void scale_and_flip( SDL_Surface *src_surface )
 
 	SDL_Rect dst_rect;
 #ifdef N64
-  dst_rect.x = -5;
+  dst_rect.x = 0;
   dst_rect.y = 20;
   dst_rect.w = 320;
   dst_rect.h = 240;

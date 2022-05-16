@@ -3,7 +3,7 @@ SOURCE_DIR=src
 BUILD_DIR=build_n64
 N64_DFS_OFFSET=2M
 include $(N64_INST)/include/n64.mk
-include Makefile_sdl2.mk
+include libs/sdl_n64/SDL2/Makefile_sdl2.mk
 
 N64_CFLAGS += -Ilibs/sdl_n64/SDL2/include -DTARGET_N64 -DTYRIAN_DIR='"rom://tyrian21"'
 
