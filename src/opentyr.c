@@ -60,14 +60,6 @@ const char *opentyrian_str = "OpenTyrian", *opentyrian_version = HG_REV;
 #include <malloc.h>
 #define printf debugf
 
-void print_memory(void) {
-  struct mallinfo mem_info = mallinfo();
-  int mem_used = mem_info.uordblks / 1024;
-  int mem_total = get_memory_size() / 1024;
-
-  printf("total_mem: %dKB/%dKB\n", mem_used, mem_total);
-}
-
 void opentyrian_menu(void) {
   typedef enum {
     MENU_ABOUT = 0,

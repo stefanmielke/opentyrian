@@ -63,8 +63,6 @@ void JE_darkenBackground( JE_word neat )  /* wild detail level */
 
 void blit_background_row( SDL_Surface *surface, int x, int y, Uint8 **map )
 {
-	assert(surface->format->BitsPerPixel == 8);
-	
 	Uint8 *pixels = (Uint8 *)surface->pixels + (y * surface->pitch) + x,
 	      *pixels_ll = (Uint8 *)surface->pixels,  // lower limit
 	      *pixels_ul = (Uint8 *)surface->pixels + (surface->h * surface->pitch);  // upper limit

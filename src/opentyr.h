@@ -70,6 +70,4 @@ extern const char *opentyrian_str, *opentyrian_version;
 
 void opentyrian_menu(void);
 
-void print_memory(void);
-
 #endif /* OPENTYR_H */

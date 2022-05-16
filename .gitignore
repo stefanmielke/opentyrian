@@ -5,6 +5,7 @@
 
 /filesystem/tyrian21/
 
+output.txt
 *.o
 *.d
 *.z64

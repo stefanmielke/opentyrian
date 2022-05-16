@@ -53,7 +53,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+#ifdef NDEBUG
 #include <libdragon.h>
+#define START_METRIC() int start = get_ticks_ms()
+#define SHARE_METRIC(message) { fprintf(stderr, message" frame_time: %u\n", get_ticks_ms() - start); start = get_ticks_ms(); }
+#else
+#define START_METRIC()
+#define SHARE_METRIC(message)
+#endif
 
 inline static void blit_enemy( SDL_Surface *surface, unsigned int i, signed int x_offset, signed int y_offset, signed int sprite_offset );
 
@@ -1021,7 +1029,7 @@ start_level_first:
 
 level_loop:
 
-	int start = get_ticks_ms();
+	START_METRIC();
 
 	//tempScreenSeg = game_screen; /* side-effect of game_screen */
 
@@ -1217,7 +1225,7 @@ level_loop:
 
 	/*Draw background*/
 	if (astralDuration == 0)
-		draw_background_1(VGAScreen);
+		draw_background_1(VGAScreen); // TODO: (N64) optimize this (takes 11ms)
 	else
 		JE_clr256(VGAScreen);
 
@@ -1695,7 +1703,7 @@ draw_player_shot_loop_end:
 		player[i].last_x_shot_move = player[i].x;
 		player[i].last_y_shot_move = player[i].y;
 	}
-	
+
 	/*=================================*/
 	/*=======Collisions Detection======*/
 	/*=================================*/
@@ -1912,7 +1920,6 @@ draw_player_shot_loop_end:
 
 	if (!portConfigChange)
 		portConfigDone = true;
-
 
 	/*-----------------------BACKGROUNDS------------------------*/
 	/*-----------------------BACKGROUND 2------------------------*/
@@ -2267,7 +2274,11 @@ draw_player_shot_loop_end:
 
 	VGAScreen = VGAScreenSeg; /* side-effect of game_screen */
 
+	SHARE_METRIC("start JE_starShowVGA");
+
 	JE_starShowVGA();
+
+	SHARE_METRIC("JE_starShowVGA");
 
 	/*Start backgrounds if no enemies on screen
 	  End level if number of enemies left to kill equals 0.*/
@@ -2315,8 +2326,6 @@ draw_player_shot_loop_end:
 			explodeMove = 2;
 		}
 	}
-
-	fprintf(stderr, "frame_time: %u\n", get_ticks_ms() - start);
 
 	if (reallyEndLevel)
 	{

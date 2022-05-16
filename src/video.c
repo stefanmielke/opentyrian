@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libdragon.h>
 
 const char *scaling_mode_names[ScalingMode_MAX] = {
     "Center",
@@ -226,21 +227,68 @@ void JE_clr256(SDL_Surface *screen) { SDL_FillRect(screen, NULL, 0); }
 void JE_showVGA(void) { scale_and_flip(VGAScreen); }
 
 void nn_16(SDL_Surface *src_surface, SDL_Texture *dst_texture) {
-  const int dst_bpp = 2;
+  // const int dst_bpp = 2;
 
-  int dst_pitch;
-  void *tmp_ptr;
-  SDL_LockTexture(dst_texture, NULL, &tmp_ptr, &dst_pitch);
+  // int dst_pitch;
+  // void *tmp_ptr;
+  // SDL_LockTexture(dst_texture, NULL, &tmp_ptr, &dst_pitch);
 
-  Uint8 *src = src_surface->pixels;
-  for (int y = 0; y < vga_height * vga_width; ++y) {
-      *(Uint16 *)tmp_ptr = rgb_palette[*src];
-      tmp_ptr += dst_bpp;
-      ++src;
-  }
+  // Uint8 *src = src_surface->pixels;
+  // for (int y = 0; y < vga_height * vga_width; ++y) {
+  //     *(Uint16 *)tmp_ptr = rgb_palette[*src];
+  //     tmp_ptr += dst_bpp;
+  //     ++src;
+  // }
+
+	Uint8 *src = src_surface->pixels, *src_temp;
+	Uint8 *dst, *dst_temp;
+
+	int src_pitch = src_surface->pitch;
+	int dst_pitch;
+
+	const int dst_Bpp = 2;         // dst_surface->format->BytesPerPixel
+	int dst_width, dst_height;
+	SDL_QueryTexture(dst_texture, NULL, NULL, &dst_width, &dst_height);
+	
+	const int height = vga_height, // src_surface->h
+	          width = vga_width,   // src_surface->w
+	          scale = dst_width / width;
+	assert(scale == dst_height / height);
+
+	void* tmp_ptr;
+	SDL_LockTexture(dst_texture, NULL, &tmp_ptr, &dst_pitch);
+	dst = tmp_ptr;
+	
+	for (int y = height; y > 0; y--)
+	{
+		src_temp = src;
+		dst_temp = dst;
+		
+		for (int x = width; x > 0; x--)
+		{
+			for (int z = scale; z > 0; z--)
+			{
+				*(Uint16 *)dst = rgb_palette[*src];
+				dst += dst_Bpp;
+			}
+			src++;
+		}
+		
+		src = src_temp + src_pitch;
+		dst = dst_temp + dst_pitch;
+		
+		for (int z = scale; z > 1; z--)
+		{
+			memcpy(dst, dst_temp, dst_width * dst_Bpp);
+			dst += dst_pitch;
+		}
+	}
+
+	SDL_UnlockTexture(dst_texture);
 }
 
 void scale_and_flip(SDL_Surface *src_surface) {
+  // int start = get_ticks_ms();
   // Apply all changes to video settings accumulated throughout the frame, here.
   if (renderer_needs_reinit) {
     reinit_renderer();
@@ -248,18 +296,22 @@ void scale_and_flip(SDL_Surface *src_surface) {
   }
 
   // Do software scaling
+  // { fprintf(stderr, "\tnn_16 - start frame_time: %u\n", get_ticks_ms() - start); start = get_ticks_ms(); }
   nn_16(src_surface, main_window_texture);
+  // { fprintf(stderr, "\tnn_16 frame_time: %u\n", get_ticks_ms() - start); start = get_ticks_ms(); }
 
   // Clear the window and blit the output texture to it
   SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
-  SDL_RenderClear(main_window_renderer);
+  // SDL_RenderClear(main_window_renderer); // no need to clear screen (9 ms)
 
-  const SDL_Rect dst_rect = { 0, 0, 320, 240 };
+  const SDL_Rect dst_rect = { 0, 0, 320, 200 };
 
   SDL_RenderSetViewport(main_window_renderer, NULL);
   SDL_RenderCopy(main_window_renderer, main_window_texture, NULL, &dst_rect);
 
+  // { fprintf(stderr, "\tSDL_RenderPresent - start frame_time: %u\n", get_ticks_ms() - start); start = get_ticks_ms(); }
   SDL_RenderPresent(main_window_renderer);
+  // { fprintf(stderr, "\tSDL_RenderPresent frame_time: %u\n", get_ticks_ms() - start); start = get_ticks_ms(); }
 
   // Save output rect to be used by mouse functions
   last_output_rect = dst_rect;
