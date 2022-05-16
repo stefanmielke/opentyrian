@@ -11,6 +11,8 @@ Right Sidekick: R
 Options: C Left
 Pause: Start
 
+Support 2 players, just remember to change the default devices to "Joystick 1" and "Joystick 2".
+
 ## Status
 
 Runs better on real hardware (but not full-speed). Will struggle on emulators.
@@ -20,6 +22,7 @@ Music/sounds not implemented.
 ## Changes from Original
 
 - Moved to 320x240 16 bits
+- Changed config defaults to lowest quality and no screen scaling
 - Removed code that would clear the screen before rendering
 - No saves or config saves (yet)
 
