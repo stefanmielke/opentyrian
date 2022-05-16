@@ -57,6 +57,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef N64
+#include <libdragon.h>
+#endif
+
 const char *opentyrian_str = "OpenTyrian";
 const char *opentyrian_version = OPENTYRIAN_VERSION;
 
