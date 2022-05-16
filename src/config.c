@@ -831,7 +831,11 @@ void JE_loadConfiguration( void )
 		background2 = true;
 		tyrMusicVolume = fxVolume = 128;
 		gammaCorrection = 0;
+#ifdef N64
+		processorType = 1;
+#else
 		processorType = 3;
+#endif
 		gameSpeed = 4;
 	}
 	
