@@ -353,6 +353,25 @@ void reset_joystick_assignments( int j )
 			}
 		}
 	}
+#ifdef N64
+	joystick[j].assignment[4][0].type = BUTTON;
+	joystick[j].assignment[4][0].num = 0; // X (fire)
+
+	joystick[j].assignment[5][0].type = BUTTON;
+	joystick[j].assignment[5][0].num = 1; // O (change fire)
+
+	joystick[j].assignment[6][0].type = BUTTON;
+	joystick[j].assignment[6][0].num = 2; // Z (left sidekick)
+
+	joystick[j].assignment[7][0].type = BUTTON;
+	joystick[j].assignment[7][0].num = 5; // R (right sidekick)
+
+	joystick[j].assignment[8][0].type = BUTTON;
+	joystick[j].assignment[8][0].num = 8; // SELECT (menu)
+
+	joystick[j].assignment[9][0].type = BUTTON;
+	joystick[j].assignment[9][0].num = 3; // START (pause)
+#endif
 	
 	joystick[j].analog = false;
 	joystick[j].sensitivity = 5;
