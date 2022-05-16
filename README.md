@@ -2,11 +2,26 @@
 
 Port of OpenTyrian to the Nintendo 64.
 
+## Controls
+
+Shoot: A
+Change Fire Mode: B
+Left Sidekick: Z
+Right Sidekick: R
+Options: C Left
+Pause: Start
+
 ## Status
 
-For now it only builds and pass the initial loadings, but still can't display anything on the screen. Most likely an issue with how SDL (the port used) creates textures and how the game manipulates them.
+Runs better on real hardware (but not full-speed). Will struggle on emulators.
 
-Another potential issue is on loading assets, it may end up using more memory than the N64 have (the assets have 12MB). We have to check how it loads assets and change the code to only load when necessary.
+Music/sounds not implemented.
+
+## Changes from Original
+
+- Moved to 320x240 16 bits
+- Removed code that would clear the screen before rendering
+- No saves or config saves (yet)
 
 ## Building
 
