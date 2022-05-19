@@ -164,10 +164,7 @@ static void init_texture( void )
 	}
 
 #ifdef N64
-	int dst_pitch;
-	void* tmp_ptr;
-	SDL_LockTexture(main_window_texture, NULL, &tmp_ptr, &dst_pitch);
-	main_window_texture_pixels = tmp_ptr;
+	main_window_texture_pixels = display_get_current_buffer(1);
 #endif
 }
 
@@ -395,32 +392,31 @@ static void scale_and_flip( SDL_Surface *src_surface )
 #ifdef N64
 	Uint8 *src = src_surface->pixels;
 	Uint8 *dst = main_window_texture_pixels;
-	for (int y = vga_width * vga_height; y > 0; y--)
+	// this will push the pixels directly to the video
+	for (int y = vga_width * vga_height; y > 0; --y)
 	{
 		*(Uint16 *)dst = rgb_palette[*src];
 		dst += 2;
 		src++;
 	}
-#else
-	assert(src_surface->format->BitsPerPixel == 8);
-	
-	assert(scaler_function != NULL);
-	scaler_function(src_surface, main_window_texture);
-#endif
 
-#ifdef N64
 	const SDL_Rect dst_rect = { 0, 20, 320, 240 };
 #else
+	assert(src_surface->format->BitsPerPixel == 8);
+
+	assert(scaler_function != NULL);
+	scaler_function(src_surface, main_window_texture);
+
 	SDL_Rect dst_rect;
 	calc_dst_render_rect(src_surface, &dst_rect);
-#endif
 
 	// Clear the window and blit the output texture to it
-	// SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
-	// SDL_RenderClear(main_window_renderer);
+	SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
+	SDL_RenderClear(main_window_renderer);
   	SDL_RenderSetViewport(main_window_renderer, &dst_rect);
 	SDL_RenderCopy(main_window_renderer, main_window_texture, NULL, &dst_rect);
 	SDL_RenderPresent(main_window_renderer);
+#endif
 
 	// Save output rect to be used by mouse functions
 	last_output_rect = dst_rect;

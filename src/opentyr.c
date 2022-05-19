@@ -741,7 +741,6 @@ int main(int argc, char *argv[]) {
 
     // debug_init_isviewer();
     // debug_init_usblog();
-    // debug_init_sdfs("sd:/", -1);
   #endif
 
   JE_loadConfiguration();

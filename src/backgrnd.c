@@ -67,7 +67,7 @@ void blit_background_row( SDL_Surface *surface, int x, int y, Uint8 **map )
 	
 	Uint8 *pixels = (Uint8 *)surface->pixels + (y * surface->pitch) + x,
 	      *pixels_ll = (Uint8 *)surface->pixels,  // lower limit
-	      *pixels_ul = (Uint8 *)surface->pixels + (surface->h * surface->pitch);  // upper limit
+	      *pixels_ul = (Uint8 *)surface->pixels + (184 * surface->pitch);  // upper limit (184 is the height of the game window)
 	
 	for (int y = 0; y < 28; y++)
 	{
@@ -156,7 +156,6 @@ void blit_background_row_blend( SDL_Surface *surface, int x, int y, Uint8 **map 
 void draw_background_1( SDL_Surface *surface )
 {
 	SDL_FillRect(surface, NULL, 0);
-	
 	Uint8 **map = (Uint8 **)mapYPos + mapXbpPos - 12;
 	
 	for (int i = -1; i < 7; i++)
