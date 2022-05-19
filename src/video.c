@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <libdragon.h>
+
 const char *const scaling_mode_names[ScalingMode_MAX] = {
 	"Center",
 	"Integer",
@@ -48,6 +50,9 @@ SDL_Window *main_window = NULL;
 static SDL_Renderer *main_window_renderer = NULL;
 SDL_PixelFormat *main_window_tex_format = NULL;
 static SDL_Texture *main_window_texture = NULL;
+#ifdef N64
+static Uint8 *main_window_texture_pixels = NULL;
+#endif
 
 static ScalerFunction scaler_function;
 
@@ -144,7 +149,7 @@ static void init_texture( void )
 	assert(main_window_renderer != NULL);
 
 	int bpp = 16; // TODOSDL2
-	Uint32 format = bpp == 32 ? SDL_PIXELFORMAT_RGB888 : SDL_PIXELFORMAT_RGBA5551;
+	Uint32 format = bpp == 32 ? SDL_PIXELFORMAT_RGBA8888 : SDL_PIXELFORMAT_RGBA5551;
 	int scaler_w = scalers[scaler].width;
 	int scaler_h = scalers[scaler].height;
 
@@ -157,6 +162,13 @@ static void init_texture( void )
 		fprintf(stderr, "error: failed to create scaler texture %dx%dx%s: %s\n", scaler_w, scaler_h, SDL_GetPixelFormatName(format), SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
+
+#ifdef N64
+	int dst_pitch;
+	void* tmp_ptr;
+	SDL_LockTexture(main_window_texture, NULL, &tmp_ptr, &dst_pitch);
+	main_window_texture_pixels = tmp_ptr;
+#endif
 }
 
 static void deinit_texture( void )
@@ -379,26 +391,34 @@ static void calc_dst_render_rect( SDL_Surface *const src_surface, SDL_Rect *cons
 
 static void scale_and_flip( SDL_Surface *src_surface )
 {
-	assert(src_surface->format->BitsPerPixel == 8);
-
 	// Do software scaling
+#ifdef N64
+	Uint8 *src = src_surface->pixels;
+	Uint8 *dst = main_window_texture_pixels;
+	for (int y = vga_width * vga_height; y > 0; y--)
+	{
+		*(Uint16 *)dst = rgb_palette[*src];
+		dst += 2;
+		src++;
+	}
+#else
+	assert(src_surface->format->BitsPerPixel == 8);
+	
 	assert(scaler_function != NULL);
 	scaler_function(src_surface, main_window_texture);
+#endif
 
-	SDL_Rect dst_rect;
 #ifdef N64
-  dst_rect.x = 0;
-  dst_rect.y = 20;
-  dst_rect.w = 320;
-  dst_rect.h = 240;
+	const SDL_Rect dst_rect = { 0, 20, 320, 240 };
 #else
-  calc_dst_render_rect(src_surface, &dst_rect);
+	SDL_Rect dst_rect;
+	calc_dst_render_rect(src_surface, &dst_rect);
 #endif
 
 	// Clear the window and blit the output texture to it
 	// SDL_SetRenderDrawColor(main_window_renderer, 0, 0, 0, 255);
 	// SDL_RenderClear(main_window_renderer);
-  SDL_RenderSetViewport(main_window_renderer, &dst_rect);
+  	SDL_RenderSetViewport(main_window_renderer, &dst_rect);
 	SDL_RenderCopy(main_window_renderer, main_window_texture, NULL, &dst_rect);
 	SDL_RenderPresent(main_window_renderer);
 

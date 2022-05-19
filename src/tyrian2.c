@@ -55,16 +55,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <libdragon.h>
-#include <malloc.h>
-void printf_memory() {
-  struct mallinfo mem_info = mallinfo();
-  int mem_used = mem_info.uordblks / 1024;
-  int mem_total = get_memory_size() / 1024;
-
-  printf("total_mem: %dKB/%dKB\n", mem_used, mem_total);
-}
-
 inline static void blit_enemy(SDL_Surface *surface, unsigned int i,
                               signed int x_offset, signed int y_offset,
                               signed int sprite_offset);
@@ -1889,7 +1879,7 @@ level_loop:
     debugHist =
         debugHist + abs((JE_longint)debugTime - (JE_longint)lastDebugTime);
     debugHistCount++;
-    sprintf(tempStr, "%2.3f", 1000.0f / roundf(debugHist / debugHistCount));
+    sprintf(tempStr, "%2.3f/%2.3f", 1000.0f / roundf(debugHist / debugHistCount), 1000.0f / abs((JE_longint)debugTime - (JE_longint)lastDebugTime));
     sprintf(buffer, "X:%d Y:%-5d  %s FPS  %d %d %d %d",
             (mapX - 1) * 12 + player[0].x, curLoc, tempStr,
             player[0].x_velocity, player[0].y_velocity, player[0].x,
