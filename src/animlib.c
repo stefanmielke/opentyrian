@@ -157,6 +157,10 @@ int JE_renderFrame( unsigned int framenumber )
 
 void JE_playAnim( const char *animfile, JE_byte startingframe, JE_byte speed )
 {
+#ifdef N64
+	// disabling animation as it causes a crash at some point on chapter 3
+	return;
+#endif
 	unsigned int i;
 	int pageNum;
 
