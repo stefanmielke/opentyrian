@@ -4,12 +4,12 @@ Port of OpenTyrian to the Nintendo 64.
 
 ## Controls
 
-Shoot: A
-Change Fire Mode: B
-Left Sidekick: Z
-Right Sidekick: R
-Options: C Left
-Pause: Start
+- Shoot: A
+- Change Fire Mode: B
+- Left Sidekick: Z
+- Right Sidekick: R
+- Options: C Left
+- Pause: Start
 
 Support 2 players, just remember to change the default devices to "Joystick 1" and "Joystick 2".
 
