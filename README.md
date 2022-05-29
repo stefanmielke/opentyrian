@@ -15,7 +15,7 @@ Support 2 players, just remember to change the default devices to "Joystick 1" a
 
 ## Status
 
-Runs better on real hardware (but not full-speed). Will struggle on emulators.
+Runs better on real hardware (but not full-speed). Will struggle on emulators other than Cen64.
 
 Music/sounds not implemented.
 
