@@ -1,12 +1,11 @@
 V=1
 SOURCE_DIR=src
 BUILD_DIR=build_n64
-N64_DFS_OFFSET=2M
 include $(N64_INST)/include/n64.mk
 include libs/sdl_n64/SDL2/Makefile_sdl2.mk
 
-N64_CFLAGS += -DTARGET_N64 -DTYRIAN_DIR='"rom://tyrian21"'
-N64_CFLAGS += -Wno-error=format-truncation= -Wno-error=array-bounds -Wno-error=format=
+N64_CFLAGS += -DTYRIAN_DIR='"rom:/tyrian21"'
+N64_CFLAGS += -Wno-error=format-truncation= -Wno-error=array-bounds -Wno-error=format= -Wno-error=dangling-pointer=
 
 N64_ROM_TITLE = "opentyrian 64"
 N64_ROM_SAVETYPE = none

@@ -254,7 +254,7 @@ bool load_opentyrian_config( void )
 	memcpy(keySettings, defaultKeySettings, sizeof(keySettings));
 	
 	Config *config = &opentyrian_config;
-	
+		
 	FILE *file = dir_fopen_warn(get_user_directory(), "opentyrian.cfg", "r");
 	if (file == NULL)
 		return false;
@@ -773,7 +773,7 @@ const char *get_user_directory( void )
 			}
 		}
 #elif defined(N64)
-		strcpy(user_dir, "sd://data/tyrian21");
+		strcpy(user_dir, "sd:/data/tyrian21");
 #else
 		strcpy(user_dir, ".");
 #endif

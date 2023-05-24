@@ -50,9 +50,6 @@ SDL_Window *main_window = NULL;
 static SDL_Renderer *main_window_renderer = NULL;
 SDL_PixelFormat *main_window_tex_format = NULL;
 static SDL_Texture *main_window_texture = NULL;
-#ifdef N64
-static Uint8 *main_window_texture_pixels = NULL;
-#endif
 
 static ScalerFunction scaler_function;
 
@@ -162,10 +159,6 @@ static void init_texture( void )
 		fprintf(stderr, "error: failed to create scaler texture %dx%dx%s: %s\n", scaler_w, scaler_h, SDL_GetPixelFormatName(format), SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-
-#ifdef N64
-	main_window_texture_pixels = display_get_current_buffer(1);
-#endif
 }
 
 static void deinit_texture( void )
@@ -390,17 +383,18 @@ static void scale_and_flip( SDL_Surface *src_surface )
 {
 	// Do software scaling
 #ifdef N64
-	Uint8 *src = src_surface->pixels;
-	Uint8 *dst = main_window_texture_pixels;
-	// this will push the pixels directly to the video
-	for (int y = vga_width * vga_height; y > 0; --y)
-	{
-		*(Uint16 *)dst = rgb_palette[*src];
-		dst += 2;
-		src++;
-	}
+	rdpq_set_mode_standard();
+	rdpq_mode_tlut(TLUT_RGBA16);
+	rdpq_tex_load_tlut(rgb_palette_render, 0, 256);
+
+    surface_t *disp = display_get();
+    rdpq_attach(disp, NULL);
+
+	surface_t temp = surface_make_linear(src_surface->pixels, FMT_CI8, 320, 200);
+	rdpq_tex_blit(&temp, 0, 0, NULL);
 
 	const SDL_Rect dst_rect = { 0, 20, 320, 240 };
+	rdpq_detach_show();
 #else
 	assert(src_surface->format->BitsPerPixel == 8);
 

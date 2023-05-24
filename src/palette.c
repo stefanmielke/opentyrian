@@ -24,6 +24,7 @@
 #include "video.h"
 
 #include <assert.h>
+#include <libdragon.h>
 
 static Uint32 rgb_to_yuv( int r, int g, int b );
 
@@ -34,6 +35,7 @@ int palette_count;
 
 static Palette palette;
 Uint32 rgb_palette[256], yuv_palette[256];
+Uint16 rgb_palette_render[256];
 
 Palette colors;
 
@@ -72,6 +74,9 @@ void set_palette( Palette colors, unsigned int first_color, unsigned int last_co
 		palette[i] = colors[i];
 		rgb_palette[i] = SDL_MapRGB(main_window_tex_format, palette[i].r, palette[i].g, palette[i].b);
 		yuv_palette[i] = rgb_to_yuv(palette[i].r, palette[i].g, palette[i].b);
+		Uint8 r, g, b;
+		SDL_GetRGB(rgb_palette[i], main_window_tex_format, &r, &g, &b);
+		rgb_palette_render[i] = color_to_packed16(RGBA32(r, g, b, 0));
 	}
 }
 
@@ -82,6 +87,9 @@ void set_colors( SDL_Color color, unsigned int first_color, unsigned int last_co
 		palette[i] = color;
 		rgb_palette[i] = SDL_MapRGB(main_window_tex_format, palette[i].r, palette[i].g, palette[i].b);
 		yuv_palette[i] = rgb_to_yuv(palette[i].r, palette[i].g, palette[i].b);
+		Uint8 r, g, b;
+		SDL_GetRGB(rgb_palette[i], main_window_tex_format, &r, &g, &b);
+		rgb_palette_render[i] = color_to_packed16(RGBA32(r, g, b, 0));
 	}
 }
 
@@ -123,6 +131,9 @@ void step_fade_palette( int diff[256][3], int steps, unsigned int first_color, u
 		
 		rgb_palette[i] = SDL_MapRGB(main_window_tex_format, palette[i].r, palette[i].g, palette[i].b);
 		yuv_palette[i] = rgb_to_yuv(palette[i].r, palette[i].g, palette[i].b);
+		Uint8 r, g, b;
+		SDL_GetRGB(rgb_palette[i], main_window_tex_format, &r, &g, &b);
+		rgb_palette_render[i] = color_to_packed16(RGBA32(r, g, b, 0));
 	}
 }
 
